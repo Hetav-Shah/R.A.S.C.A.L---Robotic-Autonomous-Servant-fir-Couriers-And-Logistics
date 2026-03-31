@@ -1,0 +1,274 @@
+# RASCAL - Autonomous Delivery Robot
+
+**R**obot **A**utonomous **S**ystem for **C**ourier **A**nd **L**ogistics
+
+---
+
+## 🚀 Project Overview
+
+RASCAL is an Arduino-based autonomous delivery robot capable of GPS waypoint navigation and Bluetooth mobile control. Designed for courier and logistics applications, it combines low-cost hardware with intelligent navigation algorithms.
+
+### Key Features
+- ✅ **Dual Control Modes:** Manual (Bluetooth) and Autonomous (GPS navigation)
+- ✅ **4-Wheel Drive:** Tank-style steering with independent motor control
+- ✅ **GPS Navigation:** Haversine-based pathfinding with 2-3m accuracy
+- ✅ **Mobile Control:** Bluetooth terminal app for commands and monitoring
+- ✅ **Real-time Status:** Position, heading, and distance updates every 2 seconds
+- ✅ **Budget-Friendly:** Complete build under $210
+
+---
+
+## 📖 Documentation
+
+This repository contains complete documentation for building and operating RASCAL:
+
+| Document | Description |
+|----------|-------------|
+| [BOM.md](BOM.md) | Complete Bill of Materials with purchase links |
+| [CONTROL_ARCHITECTURE.md](CONTROL_ARCHITECTURE.md) | System design, control flow, and algorithms |
+| [WIRING_DIAGRAM.md](WIRING_DIAGRAM.md) | Step-by-step wiring instructions with diagrams |
+| [SETUP_GUIDE.md](SETUP_GUIDE.md) | Complete assembly, software setup, and testing |
+| [MOBILE_APP_PROTOCOL.md](MOBILE_APP_PROTOCOL.md) | Bluetooth communication protocol reference |
+
+### Arduino Code
+- **Main Code:** `/app/arduino/RASCAL_Main/RASCAL_Main.ino`
+
+---
+
+## ⚡ Quick Start
+
+### Prerequisites
+- **Skills:** Basic Arduino programming, soldering
+- **Time:** 8-10 hours for first build
+- **Budget:** $200-210 (excluding tools)
+
+### Build Steps
+
+1. **Order Components** → See [BOM.md](BOM.md)
+2. **Mechanical Assembly** → Follow [SETUP_GUIDE.md](SETUP_GUIDE.md) Part 1
+3. **Wire Electronics** → Follow [WIRING_DIAGRAM.md](WIRING_DIAGRAM.md)
+4. **Upload Code** → See [SETUP_GUIDE.md](SETUP_GUIDE.md) Part 2
+5. **Test & Calibrate** → Follow [SETUP_GUIDE.md](SETUP_GUIDE.md) Part 3
+6. **Start Delivering!** → See [MOBILE_APP_PROTOCOL.md](MOBILE_APP_PROTOCOL.md)
+
+---
+
+## 📱 Mobile Control
+
+### Bluetooth Commands
+
+| Command | Action |
+|---------|--------|
+| `FWD` | Move forward |
+| `BWD` | Move backward |
+| `LEFT` | Turn left |
+| `RIGHT` | Turn right |
+| `STOP` | Stop motors |
+| `GOTO:LAT,LON` | Navigate to GPS coordinates |
+| `POS` | Get current position |
+| `CLEAR` | Cancel navigation |
+
+### Recommended Apps
+- **Android:** Serial Bluetooth Terminal (free)
+- **iOS:** BLE Terminal (requires HM-10 module instead of HC-05)
+
+---
+
+## 🛠️ Hardware Specifications
+
+### Core Components
+- **Controller:** Arduino Mega 2560
+- **Motors:** 4x TT DC Motors (3-6V)
+- **Motor Drivers:** 2x L298N H-Bridge
+- **GPS:** NEO-6M Module (±2.5m accuracy)
+- **Bluetooth:** HC-05 Classic Bluetooth (~10m range)
+- **Battery:** 7.4V 2200mAh Li-Po (2S)
+- **Power:** 2x LM2596 Buck Converters (7.4V → 5V)
+
+### Performance
+- **Speed:** ~0.5 m/s (1.8 km/h)
+- **Runtime:** 1.5 hours continuous, 3 hours typical delivery pattern
+- **Waypoint Accuracy:** ±3 meters
+- **GPS Update Rate:** 1 Hz
+- **Weight Capacity:** ~1-2 kg (depends on chassis)
+
+---
+
+## 🧮 How It Works
+
+### Autonomous Navigation Algorithm
+
+1. **Receive Waypoint** via Bluetooth (`GOTO:LAT,LON`)
+2. **Read GPS Position** (current latitude, longitude)
+3. **Calculate Distance** to waypoint (Haversine formula)
+4. **Check Arrival:** If distance < 3m → STOP
+5. **Calculate Bearing** to waypoint (0-360°)
+6. **Calculate Heading Error** = bearing - current_heading
+7. **Decide Action:**
+   - Error < 15° → Move Forward
+   - Error > 15° → Turn Right
+   - Error < -15° → Turn Left
+8. **Update Heading** from GPS movement
+9. **Repeat** until waypoint reached
+
+### Control Modes
+
+```
+STOPPED → (FWD/BWD/LEFT/RIGHT) → MANUAL
+   ↑                                    |
+   |                                    v
+   ←──────── (STOP) ──────────┘
+
+STOPPED → (GOTO:LAT,LON) → AUTONOMOUS
+   ↑                             |
+   └───── (Waypoint Reached) ─┘
+```
+
+---
+
+## 📋 Project Structure
+
+```
+RASCAL/
+├── arduino/
+│   └── RASCAL_Main/
+│       └── RASCAL_Main.ino          # Main Arduino code
+├── docs/
+│   ├── BOM.md                       # Bill of Materials
+│   ├── CONTROL_ARCHITECTURE.md      # System design
+│   ├── WIRING_DIAGRAM.md            # Hardware connections
+│   ├── SETUP_GUIDE.md               # Complete setup instructions
+│   ├── MOBILE_APP_PROTOCOL.md       # Communication protocol
+│   └── README.md                    # This file
+└── README.md                        # Project root readme
+```
+
+---
+
+## 🎓 Learning Outcomes
+
+Building RASCAL teaches:
+- ☑️ Arduino programming (C++)
+- ☑️ GPS coordinate systems and navigation math
+- ☑️ Motor control (PWM, H-bridge drivers)
+- ☑️ Serial communication (UART, Bluetooth)
+- ☑️ Power management (Li-Po batteries, buck converters)
+- ☑️ State machine design
+- ☑️ Hardware integration
+- ☑️ Mobile app communication protocols
+
+---
+
+## 🚀 Upgrade Path: Prototype 2
+
+Next-generation RASCAL with advanced features:
+
+### Hardware Upgrades
+- **Raspberry Pi 4** (4GB) - More compute power
+- **RPLidar A1** - 360° laser scanner for obstacle avoidance
+- **Intel RealSense D435** - Depth camera (optional)
+- **U-blox ZED-F9P** - RTK GPS (cm-level accuracy)
+- **MPU-9250** - 9-axis IMU for better heading
+
+### Software Upgrades
+- **ROS Noetic** - Robot Operating System
+- **SLAM** - Simultaneous Localization And Mapping
+- **Nav Stack** - Advanced path planning (A*, DWA)
+- **Real-time Mapping** - Create environment maps
+- **Obstacle Avoidance** - Navigate around objects
+
+**Estimated Cost:** +$600  
+**Difficulty:** Advanced
+
+---
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+| Problem | Solution |
+|---------|----------|
+| Motors don't spin | Check L298N power, verify pin connections |
+| GPS no fix | Move outdoors, wait 60s, check antenna up |
+| Bluetooth won't pair | Check HC-05 power, voltage divider installed |
+| Robot drives in circles | Calibrate motor speeds in code |
+| Waypoint not reached | Increase WAYPOINT_THRESHOLD to 5m |
+
+See [SETUP_GUIDE.md](SETUP_GUIDE.md) Part 5 for detailed troubleshooting.
+
+---
+
+## 🔒 Safety Guidelines
+
+- ⚠️ Test in controlled environments first
+- ⚠️ Keep robot in visual line of sight
+- ⚠️ Have emergency STOP ready
+- ⚠️ Don't operate near traffic or crowds
+- ⚠️ Li-Po battery safety: never over-discharge, use fireproof bag when charging
+- ⚠️ Voltage divider required for HC-05 RX (3.3V logic)
+
+---
+
+## 📚 Resources
+
+### Libraries Used
+- **TinyGPSPlus** by Mikal Hart - GPS parsing
+- **SoftwareSerial** - Additional serial ports
+
+### External Links
+- [Arduino Forum](https://forum.arduino.cc)
+- [TinyGPS++ GitHub](https://github.com/mikalhart/TinyGPSPlus)
+- [GPS Coordinate Finder](https://www.latlong.net)
+- [Haversine Formula](https://en.wikipedia.org/wiki/Haversine_formula)
+
+---
+
+## 💬 Support
+
+For questions or issues:
+1. Check [SETUP_GUIDE.md](SETUP_GUIDE.md) troubleshooting section
+2. Review [WIRING_DIAGRAM.md](WIRING_DIAGRAM.md) connections
+3. Post on Arduino Forum with "RASCAL" tag
+
+---
+
+## 🌟 Future Enhancements
+
+Potential improvements:
+- [ ] Battery voltage monitoring and low-battery warning
+- [ ] Ultrasonic sensors for basic obstacle detection
+- [ ] SD card logging of routes and telemetry
+- [ ] Custom Android/iOS app with map interface
+- [ ] Multi-waypoint route planning
+- [ ] Return-to-home function
+- [ ] Speed ramping for smoother acceleration
+- [ ] Encoder feedback for accurate odometry
+
+---
+
+## 🏆 Project Status
+
+**Current Version:** Prototype 1 (Arduino-based)  
+**Status:** ✅ Complete and tested  
+**Next Milestone:** Prototype 2 with ROS and Lidar
+
+---
+
+## 📜 License
+
+This project is open-source for educational purposes. Feel free to modify, improve, and share!
+
+---
+
+## 🚀 Get Started Now!
+
+1. **Read:** [BOM.md](BOM.md) - Order your components
+2. **Build:** [SETUP_GUIDE.md](SETUP_GUIDE.md) - Follow step-by-step
+3. **Control:** [MOBILE_APP_PROTOCOL.md](MOBILE_APP_PROTOCOL.md) - Start testing
+
+**Happy Building!** 🤖
+
+---
+
+*RASCAL - Making autonomous delivery accessible to everyone*  
+*Version 1.0 | January 2026*
