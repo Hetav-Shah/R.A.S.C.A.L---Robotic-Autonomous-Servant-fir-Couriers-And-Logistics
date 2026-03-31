@@ -1,0 +1,706 @@
+# RASCAL - Mobile App Communication Protocol
+
+## 📡 Overview
+
+This document describes the complete communication protocol between the mobile app (via Bluetooth) and the RASCAL robot's Arduino controller.
+
+**Protocol Type:** Serial text-based (ASCII)  
+**Transport:** Bluetooth Classic (HC-05) via UART  
+**Baud Rate:** 9600 bps  
+**Line Ending:** Newline (`\n`)  
+**Direction:** Bidirectional
+
+---
+
+## 📤 Command Structure (Phone → Robot)
+
+### Format
+```
+COMMAND[\n]
+```
+or
+```
+COMMAND:PARAMETER[\n]
+```
+
+- **Case Sensitive:** Commands should be UPPERCASE
+- **Delimiter:** Colon (`:`) separates command from parameters
+- **Terminator:** Newline character (`\n`) ends each command
+- **Encoding:** ASCII text
+
+---
+
+## 📝 Command Reference
+
+### 1. Motion Commands
+
+#### FWD - Move Forward
+```
+FWD[\n]
+```
+**Description:** Move robot forward at BASE_SPEED  
+**Parameters:** None  
+**Mode Change:** Switches to MANUAL mode  
+**Duration:** Continuous until new command  
+**Response:** None (see status updates)
+
+**Example:**
+```
+Send: FWD
+```
+
+---
+
+#### BWD - Move Backward
+```
+BWD[\n]
+```
+**Description:** Move robot backward at BASE_SPEED  
+**Parameters:** None  
+**Mode Change:** Switches to MANUAL mode  
+
+**Example:**
+```
+Send: BWD
+```
+
+---
+
+#### LEFT - Turn Left
+```
+LEFT[\n]
+```
+**Description:** Rotate robot counterclockwise (tank turn)  
+**Parameters:** None  
+**Mode Change:** Switches to MANUAL mode  
+**Turn Type:** In-place rotation (left wheels backward, right forward)
+
+**Example:**
+```
+Send: LEFT
+```
+
+---
+
+#### RIGHT - Turn Right
+```
+RIGHT[\n]
+```
+**Description:** Rotate robot clockwise (tank turn)  
+**Parameters:** None  
+**Mode Change:** Switches to MANUAL mode  
+
+**Example:**
+```
+Send: RIGHT
+```
+
+---
+
+#### STOP - Stop All Motors
+```
+STOP[\n]
+```
+**Description:** Immediately halt all motors  
+**Parameters:** None  
+**Mode Change:** Switches to STOPPED mode  
+**Use Case:** Emergency stop, end of manual control
+
+**Example:**
+```
+Send: STOP
+```
+
+---
+
+### 2. Autonomous Navigation Commands
+
+#### GOTO - Set Waypoint and Navigate
+```
+GOTO:LATITUDE,LONGITUDE[\n]
+```
+**Description:** Set target GPS coordinates and begin autonomous navigation  
+**Parameters:**  
+- `LATITUDE`: Decimal degrees (e.g., 37.774929)
+- `LONGITUDE`: Decimal degrees (e.g., -122.419416)
+
+**Mode Change:** Switches to AUTONOMOUS mode  
+**Response:** `WAYPOINT:SET`  
+**Completion:** `WAYPOINT:REACHED` when within threshold
+
+**Example:**
+```
+Send: GOTO:37.774929,-122.419416
+Receive: WAYPOINT:SET
+[Robot navigates...]
+Receive: WAYPOINT:REACHED
+```
+
+**Coordinate Format:**
+- Use decimal degrees (DD.dddddd)
+- Latitude range: -90.0 to 90.0
+- Longitude range: -180.0 to 180.0
+- Precision: 6 decimal places recommended (~0.1m accuracy)
+
+**Getting Coordinates:**
+- Google Maps: Right-click → Coordinates
+- GPS app: Long-press on map
+- Online: https://www.latlong.net
+
+---
+
+#### CLEAR - Cancel Waypoint
+```
+CLEAR[\n]
+```
+**Description:** Cancel autonomous navigation and stop  
+**Parameters:** None  
+**Mode Change:** Switches to STOPPED mode  
+**Response:** `WAYPOINT:CLEARED`
+
+**Example:**
+```
+Send: CLEAR
+Receive: WAYPOINT:CLEARED
+```
+
+---
+
+### 3. Status & Configuration Commands
+
+#### POS - Request Position & Status
+```
+POS[\n]
+```
+**Description:** Request immediate status update  
+**Parameters:** None  
+**Response:** Full STATUS message (see below)
+
+**Example:**
+```
+Send: POS
+Receive: STATUS:MANUAL|37.774929,-122.419416|SAT:8|HDG:245.3
+```
+
+---
+
+#### SPEED - Adjust Motor Speed
+```
+SPEED:VALUE[\n]
+```
+**Description:** Change base motor speed  
+**Parameters:**  
+- `VALUE`: Integer 0-255 (PWM duty cycle)
+  - 0 = stopped
+  - 128 = 50% power
+  - 255 = 100% power
+
+**Response:** `SPEED:SET:VALUE`  
+**Note:** Current implementation acknowledges but may not persist
+
+**Example:**
+```
+Send: SPEED:220
+Receive: SPEED:SET:220
+```
+
+---
+
+## 📥 Response Structure (Robot → Phone)
+
+### Format
+```
+TYPE:DATA1|DATA2|DATA3[\n]
+```
+
+- **Delimiter:** Pipe (`|`) separates data fields
+- **Terminator:** Newline character (`\n`)
+
+---
+
+## 📨 Response Messages
+
+### Startup Message
+```
+RASCAL:READY[\n]
+```
+**When:** Sent immediately after Arduino powers on  
+**Purpose:** Indicates robot is initialized and ready for commands
+
+---
+
+### Waypoint Responses
+
+#### Waypoint Set Confirmation
+```
+WAYPOINT:SET[\n]
+```
+**When:** After valid GOTO command received
+
+#### Waypoint Reached
+```
+WAYPOINT:REACHED[\n]
+```
+**When:** Robot arrives within WAYPOINT_THRESHOLD (default 3m) of target
+
+#### Waypoint Cleared
+```
+WAYPOINT:CLEARED[\n]
+```
+**When:** After CLEAR command received
+
+---
+
+### Status Update (Periodic)
+```
+STATUS:MODE|POSITION|SATELLITES|HEADING[|WAYPOINT|DISTANCE][\n]
+```
+
+**Frequency:** Every 2 seconds (automatic)  
+**Also sent:** In response to POS command
+
+#### Fields:
+
+1. **MODE**
+   - `MANUAL` - Under direct Bluetooth control
+   - `AUTO` - Autonomous navigation active
+   - `STOPPED` - Motors off, idle
+
+2. **POSITION**
+   - Format: `LAT,LON` (decimal degrees)
+   - Example: `37.774929,-122.419416`
+   - Special: `NO_GPS` if no valid fix
+
+3. **SATELLITES**
+   - Format: `SAT:N`
+   - N = number of satellites in use
+   - Example: `SAT:8`
+   - Minimum for fix: 4
+   - Good fix: 8+
+
+4. **HEADING**
+   - Format: `HDG:DEG`
+   - DEG = heading in degrees (0-360)
+   - Example: `HDG:245.3`
+   - 0° = North, 90° = East, 180° = South, 270° = West
+
+5. **WAYPOINT** (only in AUTONOMOUS mode)
+   - Format: `WP:LAT,LON`
+   - Target coordinates
+   - Example: `WP:37.775000,-122.420000`
+
+6. **DISTANCE** (only in AUTONOMOUS mode)
+   - Format: `DIST:M`
+   - Distance to waypoint in meters
+   - Example: `DIST:15.7`
+
+#### Complete Examples:
+
+**Manual Mode:**
+```
+STATUS:MANUAL|37.774929,-122.419416|SAT:8|HDG:245.3
+```
+
+**Autonomous Mode:**
+```
+STATUS:AUTO|37.774929,-122.419416|SAT:10|HDG:32.1|WP:37.775000,-122.420000|DIST:8.3
+```
+
+**No GPS Fix:**
+```
+STATUS:STOPPED|NO_GPS|SAT:0|HDG:0.0
+```
+
+---
+
+## 📊 Parsing Status Messages
+
+### Example Parsing (Pseudocode)
+
+```python
+def parse_status(message):
+    # Remove "STATUS:" prefix
+    data = message.replace("STATUS:", "")
+    
+    # Split by pipe
+    fields = data.split("|")
+    
+    status = {
+        "mode": fields[0],
+        "gps_valid": fields[1] != "NO_GPS",
+        "satellites": int(fields[2].split(":")[1]),
+        "heading": float(fields[3].split(":")[1])
+    }
+    
+    if status["gps_valid"]:
+        lat, lon = fields[1].split(",")
+        status["latitude"] = float(lat)
+        status["longitude"] = float(lon)
+    
+    if status["mode"] == "AUTO" and len(fields) > 4:
+        wp_lat, wp_lon = fields[4].split(":")[1].split(",")
+        status["waypoint_lat"] = float(wp_lat)
+        status["waypoint_lon"] = float(wp_lon)
+        status["distance"] = float(fields[5].split(":")[1])
+    
+    return status
+```
+
+---
+
+## 🔄 Communication Flow Examples
+
+### Example 1: Manual Control Session
+
+```
+Phone          Robot
+  |              |
+  |              |--- RASCAL:READY
+  |<-------------|
+  |              |
+  |--- FWD ------|
+  |              |... moves forward
+  |              |
+  |              |--- STATUS:MANUAL|...
+  |<-------------|
+  |              |
+  |--- STOP -----|
+  |              |... stops
+  |              |
+```
+
+### Example 2: Autonomous Delivery
+
+```
+Phone                    Robot
+  |                        |
+  |--- POS ----------------|  (Get current position)
+  |                        |
+  |<--- STATUS:STOPPED|37.7749,-122.4194|...
+  |                        |
+  |--- GOTO:37.7750,-122.4195
+  |                        |
+  |<--- WAYPOINT:SET ------|
+  |                        |... navigating
+  |                        |
+  |<--- STATUS:AUTO|37.7749,-122.4194|...|DIST:10.2
+  |                        |... navigating
+  |<--- STATUS:AUTO|37.7749,-122.4195|...|DIST:5.1
+  |                        |... navigating
+  |<--- STATUS:AUTO|37.7750,-122.4195|...|DIST:1.2
+  |                        |... arrived
+  |<--- WAYPOINT:REACHED --|
+  |                        |
+```
+
+### Example 3: Multi-Waypoint Route
+
+```python
+# Pseudocode for sequential waypoints
+
+waypoints = [
+    (37.7749, -122.4194),
+    (37.7751, -122.4196),
+    (37.7753, -122.4198)
+]
+
+for lat, lon in waypoints:
+    send(f"GOTO:{lat},{lon}")
+    
+    # Wait for confirmation
+    response = wait_for_message()
+    if response != "WAYPOINT:SET":
+        print("Error setting waypoint")
+        break
+    
+    # Wait for arrival
+    while True:
+        msg = wait_for_message()
+        if msg == "WAYPOINT:REACHED":
+            print(f"Reached waypoint {lat},{lon}")
+            break
+        elif "STATUS:AUTO" in msg:
+            # Parse distance
+            dist = parse_distance(msg)
+            print(f"Distance remaining: {dist}m")
+
+print("Delivery complete!")
+```
+
+---
+
+## ⚡ Protocol Specifications
+
+### Timing
+
+| Parameter | Value | Notes |
+|-----------|-------|-------|
+| Baud Rate | 9600 bps | Both Bluetooth and GPS |
+| Command Response | <100ms | Immediate for most commands |
+| Status Update Interval | 2000ms | Automatic, every 2 seconds |
+| GPS Update Rate | 1000ms | Internal, affects heading calc |
+| Command Timeout | N/A | No timeout, last command persists |
+
+### Buffer Sizes
+
+- **Bluetooth Receive Buffer:** 64 bytes (Arduino Serial)
+- **Maximum Command Length:** 50 characters
+- **Maximum Response Length:** 150 characters
+
+### Error Handling
+
+- **Invalid Command:** Silently ignored (no error message)
+- **Malformed GOTO:** Silently ignored
+- **GPS Loss During Navigation:** Robot stops, waits for fix
+- **Bluetooth Disconnection:** Robot continues last command
+
+---
+
+## 📱 Mobile App Implementation Guide
+
+### Recommended Architecture
+
+```
+[UI Layer]
+    |
+    v
+[Command Builder]
+    |
+    v
+[Bluetooth Manager] ←→ HC-05
+    |
+    v
+[Status Parser]
+    |
+    v
+[Data Store / UI Update]
+```
+
+### Key Components
+
+#### 1. Bluetooth Manager
+```java
+// Android example
+class BluetoothManager {
+    private BluetoothSocket socket;
+    private OutputStream outStream;
+    private InputStream inStream;
+    
+    void sendCommand(String cmd) {
+        try {
+            outStream.write((cmd + "\n").getBytes());
+            outStream.flush();
+        } catch (IOException e) {
+            // Handle error
+        }
+    }
+    
+    void startListening() {
+        new Thread(() -> {
+            BufferedReader reader = new BufferedReader(
+                new InputStreamReader(inStream));
+            try {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    onMessageReceived(line);
+                }
+            } catch (IOException e) {
+                // Handle disconnect
+            }
+        }).start();
+    }
+}
+```
+
+#### 2. Status Parser
+```java
+class StatusData {
+    String mode;
+    double latitude, longitude;
+    int satellites;
+    double heading;
+    Double waypointLat, waypointLon;
+    Double distance;
+    boolean gpsValid;
+    
+    static StatusData parse(String message) {
+        // Implement parsing logic
+        StatusData data = new StatusData();
+        String[] parts = message.replace("STATUS:", "").split("\\|");
+        data.mode = parts[0];
+        // ... parse other fields
+        return data;
+    }
+}
+```
+
+#### 3. UI Elements
+
+Recommended UI components:
+- **Joystick/D-pad:** FWD, BWD, LEFT, RIGHT buttons
+- **Stop button:** Large, red, always accessible
+- **Map view:** Show current position, waypoint, path
+- **Status display:** Mode, GPS satellites, distance
+- **Waypoint input:** Lat/lon entry or map tap
+- **Connection indicator:** Bluetooth status
+
+---
+
+## 🔒 Security Considerations
+
+### Bluetooth Pairing
+- **Default PIN:** 1234 or 0000 (HC-05 default)
+- **Recommendation:** Change PIN in HC-05 AT mode
+- **Range:** ~10 meters (line of sight)
+
+### Command Validation
+- No authentication in current protocol
+- Any paired device can send commands
+- **Future Enhancement:** Add command authentication
+
+---
+
+## 🧠 Advanced Features (Future)
+
+### Potential Extensions
+
+#### 1. Speed Control (Implemented)
+```
+SPEED:200[\n]
+```
+Adjust motor speed on-the-fly
+
+#### 2. Route Uploading (Future)
+```
+ROUTE:LAT1,LON1;LAT2,LON2;LAT3,LON3[\n]
+```
+Send multiple waypoints at once
+
+#### 3. Obstacle Detection (Prototype 2)
+```
+ALERT:OBSTACLE_DETECTED[\n]
+```
+Robot reports obstacles via Lidar
+
+#### 4. Battery Status (Hardware Addition)
+```
+STATUS:...|BAT:75[\n]
+```
+Report battery percentage
+
+#### 5. Emergency Stop Flag
+```
+ESTOP[\n]
+```
+Harder stop with flag to prevent restart
+
+---
+
+## 📚 Reference Implementation
+
+### Python Example (Desktop Testing)
+
+```python
+import serial
+import time
+
+class RASCALController:
+    def __init__(self, port):
+        self.serial = serial.Serial(port, 9600, timeout=1)
+        time.sleep(2)  # Wait for Arduino reset
+        
+    def send_command(self, cmd):
+        self.serial.write(f"{cmd}\n".encode())
+        print(f"Sent: {cmd}")
+    
+    def forward(self):
+        self.send_command("FWD")
+    
+    def backward(self):
+        self.send_command("BWD")
+    
+    def turn_left(self):
+        self.send_command("LEFT")
+    
+    def turn_right(self):
+        self.send_command("RIGHT")
+    
+    def stop(self):
+        self.send_command("STOP")
+    
+    def goto(self, lat, lon):
+        self.send_command(f"GOTO:{lat},{lon}")
+    
+    def get_position(self):
+        self.send_command("POS")
+    
+    def read_response(self):
+        if self.serial.in_waiting:
+            return self.serial.readline().decode().strip()
+        return None
+
+# Usage
+robot = RASCALController('/dev/ttyUSB0')  # or COM3 on Windows
+
+robot.forward()
+time.sleep(2)
+robot.stop()
+
+robot.goto(37.7750, -122.4195)
+
+while True:
+    msg = robot.read_response()
+    if msg:
+        print(f"Received: {msg}")
+        if msg == "WAYPOINT:REACHED":
+            break
+    time.sleep(0.1)
+```
+
+---
+
+## 🔍 Debugging Protocol
+
+### Enable Serial Monitor
+Connect Arduino via USB (with battery OFF) and open Serial Monitor (9600 baud)
+
+### What You'll See:
+```
+RASCAL Autonomous Delivery Robot
+Initializing...
+Waiting for GPS fix...
+BT Command: FWD
+Distance: 15.3m, Bearing: 32.5°, Heading: 28.1°, Error: 4.4°
+Waypoint reached!
+```
+
+### Common Debug Messages:
+- `BT Command: [cmd]` - Command received
+- `Waypoint set: [lat], [lon]` - Navigation started
+- `Distance: [dist]m` - Waypoint distance calculated
+- `Bearing: [deg]°` - Direction to target
+- `Heading: [deg]°` - Robot's current heading
+
+---
+
+## 📊 Protocol Version
+
+**Current Version:** 1.0  
+**Last Updated:** January 2026  
+**Compatibility:** RASCAL Prototype 1 (Arduino-based)
+
+### Version History
+- **1.0** (Jan 2026) - Initial protocol with basic commands and GPS navigation
+
+---
+
+## 🔗 Related Documents
+
+- [Control Architecture](CONTROL_ARCHITECTURE.md) - System overview
+- [Setup Guide](SETUP_GUIDE.md) - Hardware and software setup
+- [BOM](BOM.md) - Component list
+- [Wiring Diagram](WIRING_DIAGRAM.md) - Hardware connections
+
+---
+
+*This protocol documentation is for developers building mobile apps or control interfaces for RASCAL.*
