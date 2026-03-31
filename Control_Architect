@@ -1,0 +1,485 @@
+# RASCAL - Control Architecture
+
+## 🎯 System Overview
+
+RASCAL is an autonomous delivery robot with dual control modes:
+1. **Manual Mode** - Direct control via Bluetooth mobile app
+2. **Autonomous Mode** - GPS waypoint navigation with obstacle awareness
+
+---
+
+## 🏗️ System Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         MOBILE APP                              │
+│                    (Bluetooth Terminal)                         │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐      │
+│  │ Manual   │  │ Auto     │  │ GPS      │  │ Status   │      │
+│  │ Control  │  │ Navigate │  │ Tracking │  │ Monitor  │      │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘      │
+└────────────────────────┬────────────────────────────────────────┘
+                         │ Bluetooth Commands (UART)
+                         │ FWD/BWD/LEFT/RIGHT/GOTO:LAT,LON
+                         ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    ARDUINO MEGA 2560                            │
+│  ┌────────────────────────────────────────────────────────┐    │
+│  │              MAIN CONTROL LOOP                         │    │
+│  │  • Bluetooth Command Parser                            │    │
+│  │  • GPS Data Processor (TinyGPS++)                     │    │
+│  │  • Mode State Machine                                  │    │
+│  │  • Navigation Controller                               │    │
+│  │  • Motor Controller                                    │    │
+│  └────────────────────────────────────────────────────────┘    │
+│                                                                 │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐        │
+│  │ HC-05        │  │ NEO-6M       │  │ Status LED   │        │
+│  │ Bluetooth    │  │ GPS Module   │  │ & Buzzer     │        │
+│  │ (RX/TX)      │  │ (SoftSerial) │  │              │        │
+│  └──────┬───────┘  └──────┬───────┘  └──────────────┘        │
+└─────────┼──────────────────┼──────────────────────────────────┘
+          │                  │
+          │                  └─► Position Data (Lat/Lon/Speed)
+          │
+          └─► Commands & Status
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                  MOTOR CONTROL SYSTEM                           │
+│                                                                 │
+│   ┌─────────────┐              ┌─────────────┐               │
+│   │  L298N #1   │              │  L298N #2   │               │
+│   │ Motor Driver│              │ Motor Driver│               │
+│   └─────┬───┬───┘              └───┬────┬────┘               │
+│         │   │                      │    │                     │
+│    ┌────▼┐ ┌▼────┐           ┌────▼┐  ┌▼────┐              │
+│    │ FL  │ │ FR  │           │ BL  │  │ BR  │              │
+│    │Motor│ │Motor│           │Motor│  │Motor│              │
+│    └──┬──┘ └──┬──┘           └──┬──┘  └──┬──┘              │
+│       │       │                 │        │                  │
+│    ┌──▼───┐┌──▼───┐         ┌──▼───┐┌──▼───┐             │
+│    │Wheel ││Wheel │         │Wheel ││Wheel │             │
+│    │  FL  ││  FR  │         │  BL  ││  BR  │             │
+│    └──────┘└──────┘         └──────┘└──────┘             │
+└─────────────────────────────────────────────────────────────────┘
+                         ▲
+                         │ Power (7.4V)
+                         │
+┌────────────────────────┴─────────────────────────────────────────┐
+│                    POWER DISTRIBUTION                            │
+│                                                                  │
+│  ┌───────────────┐      ┌──────────┐      ┌──────────┐        │
+│  │ 7.4V Li-Po    │─────►│ Buck Conv│─────►│ Arduino  │        │
+│  │ 2200mAh       │  │   │ 5V       │      │ 5V       │        │
+│  │ Battery       │  │   └──────────┘      └──────────┘        │
+│  └───────────────┘  │                                           │
+│                     │   ┌──────────┐      ┌──────────┐        │
+│                     └──►│ Buck Conv│─────►│ GPS &    │        │
+│                         │ 5V       │      │Bluetooth │        │
+│                         └──────────┘      └──────────┘        │
+│                                                                  │
+│                     └──►┌──────────┐                           │
+│                         │ Motors   │                           │
+│                         │ (via     │                           │
+│                         │ L298N)   │                           │
+│                         └──────────┘                           │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🔄 Control Flow
+
+### State Machine
+
+```
+┌─────────────┐
+│   STOPPED   │◄─────────────────┐
+└──────┬──────┘                  │
+       │                         │
+       │ FWD/BWD/LEFT/RIGHT      │ STOP command
+       ▼                         │
+┌─────────────┐                  │
+│   MANUAL    │──────────────────┤
+│    MODE     │                  │
+└──────┬──────┘                  │
+       │                         │
+       │ GOTO:LAT,LON            │
+       ▼                         │
+┌─────────────┐                  │
+│ AUTONOMOUS  │                  │
+│    MODE     │──────────────────┤
+└─────────────┘                  │
+       │                         │
+       │ Waypoint reached        │
+       └─────────────────────────┘
+```
+
+### Manual Mode Flow
+
+```
+Bluetooth Command Received
+        │
+        ▼
+  Parse Command
+        │
+        ├─► "FWD"   ──► moveForward(BASE_SPEED)
+        ├─► "BWD"   ──► moveBackward(BASE_SPEED)
+        ├─► "LEFT"  ──► turnLeft(TURN_SPEED)
+        ├─► "RIGHT" ──► turnRight(TURN_SPEED)
+        └─► "STOP"  ──► stopMotors()
+```
+
+### Autonomous Navigation Flow
+
+```
+GOTO:LAT,LON Command
+        │
+        ▼
+Set Target Waypoint
+        │
+        ▼
+┌───────────────────┐
+│  Navigation Loop  │
+└────────┬──────────┘
+         │
+         ▼
+  Read GPS Position
+         │
+         ▼
+  Calculate Distance
+  to Waypoint
+         │
+         ├─► < 3m? ──► STOP (Waypoint Reached)
+         │
+         └─► > 3m
+              │
+              ▼
+         Calculate Bearing
+         to Waypoint
+              │
+              ▼
+         Calculate Heading
+         Error
+              │
+              ├─► Error < 15° ──► moveForward()
+              ├─► Error > 15° ──► turnRight()
+              └─► Error < -15° ─► turnLeft()
+              │
+              └─► Loop back
+```
+
+---
+
+## 📡 Communication Protocol
+
+### Bluetooth Commands (Phone → Arduino)
+
+| Command | Format | Description | Example |
+|---------|--------|-------------|----------|
+| Forward | `FWD` | Move forward at base speed | `FWD` |
+| Backward | `BWD` | Move backward at base speed | `BWD` |
+| Left | `LEFT` | Turn left (tank turn) | `LEFT` |
+| Right | `RIGHT` | Turn right (tank turn) | `RIGHT` |
+| Stop | `STOP` | Stop all motors | `STOP` |
+| Go to Waypoint | `GOTO:LAT,LON` | Navigate to GPS coordinates | `GOTO:37.7749,-122.4194` |
+| Clear Waypoint | `CLEAR` | Cancel autonomous navigation | `CLEAR` |
+| Get Position | `POS` | Request current status | `POS` |
+| Set Speed | `SPEED:0-255` | Adjust motor speed | `SPEED:200` |
+
+### Status Messages (Arduino → Phone)
+
+| Message Type | Format | Example |
+|--------------|--------|----------|
+| Ready | `RASCAL:READY` | Sent on startup |
+| Waypoint Set | `WAYPOINT:SET` | Confirmation of GOTO command |
+| Waypoint Reached | `WAYPOINT:REACHED` | Destination achieved |
+| Waypoint Cleared | `WAYPOINT:CLEARED` | Navigation canceled |
+| Status Update | `STATUS:MODE\|LAT,LON\|SAT:N\|HDG:DEG\|WP:LAT,LON\|DIST:M` | Sent every 2 seconds |
+
+**Status Update Example:**
+```
+STATUS:AUTO|37.774929,-122.419416|SAT:8|HDG:245.3|WP:37.775000,-122.420000|DIST:15.7
+```
+
+---
+
+## 🧮 Navigation Algorithm
+
+### Distance Calculation (Haversine Formula)
+
+```cpp
+double calculateDistance(lat1, lon1, lat2, lon2) {
+    R = 6371000; // Earth radius in meters
+    dLat = radians(lat2 - lat1);
+    dLon = radians(lon2 - lon1);
+    
+    a = sin²(dLat/2) + cos(lat1) * cos(lat2) * sin²(dLon/2);
+    c = 2 * atan2(√a, √(1-a));
+    
+    return R * c; // meters
+}
+```
+
+### Bearing Calculation
+
+```cpp
+double calculateBearing(lat1, lon1, lat2, lon2) {
+    dLon = radians(lon2 - lon1);
+    y = sin(dLon) * cos(lat2);
+    x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(dLon);
+    
+    bearing = atan2(y, x) * 180 / PI;
+    return (bearing + 360) % 360; // Normalize to 0-360°
+}
+```
+
+### Heading Control Logic
+
+```
+headingError = bearingToTarget - currentHeading
+
+// Normalize to -180° to +180°
+if (headingError > 180)  headingError -= 360
+if (headingError < -180) headingError += 360
+
+if (|headingError| < 15°):
+    moveForward()        // Good heading
+else if (headingError > 0):
+    turnRight()          // Need to turn right
+else:
+    turnLeft()           // Need to turn left
+```
+
+---
+
+## ⚡ Motor Control
+
+### 4-Wheel Drive Configuration
+
+```
+      Front
+   FL      FR
+    ●------●
+    |  ▲   |
+    |  |   |  Forward direction
+    |      |
+    ●------●
+   BL      BR
+```
+
+### Movement Primitives
+
+| Movement | FL | FR | BL | BR |
+|----------|----|----|----|----||
+| Forward  | ↑  | ↑  | ↑  | ↑  |
+| Backward | ↓  | ↓  | ↓  | ↓  |
+| Turn Left (Tank) | ↓  | ↑  | ↓  | ↑  |
+| Turn Right (Tank) | ↑  | ↓  | ↑  | ↓  |
+| Stop | ●  | ●  | ●  | ●  |
+
+### PWM Speed Control
+
+- **Base Speed:** 200/255 (78% power) - Good for straight movement
+- **Turn Speed:** 180/255 (71% power) - Slower for precise turns
+- **Range:** 0-255 (8-bit PWM)
+
+---
+
+## 🎛️ Pin Assignments
+
+### Arduino Mega 2560 Pin Map
+
+```
+┌─────────────────────────────────────────┐
+│        Arduino Mega 2560                │
+├─────────────────────────────────────────┤
+│ Digital PWM Pins (Motor Control)       │
+│  2  → FL Motor Enable (PWM)            │
+│  3  → FR Motor Enable (PWM)            │
+│  4  → BL Motor Enable (PWM)            │
+│  5  → BR Motor Enable (PWM)            │
+│                                         │
+│ Digital I/O (Motor Direction)          │
+│  22 → FL Motor IN1                     │
+│  23 → FL Motor IN2                     │
+│  24 → FR Motor IN1                     │
+│  25 → FR Motor IN2                     │
+│  26 → BL Motor IN1                     │
+│  27 → BL Motor IN2                     │
+│  28 → BR Motor IN1                     │
+│  29 → BR Motor IN2                     │
+│                                         │
+│ Serial Communication                    │
+│  10 → GPS RX (SoftwareSerial)          │
+│  11 → GPS TX (SoftwareSerial)          │
+│  18 → Bluetooth RX (Hardware Serial1)  │
+│  19 → Bluetooth TX (Hardware Serial1)  │
+│                                         │
+│ Status                                  │
+│  13 → Status LED (built-in)            │
+└─────────────────────────────────────────┘
+```
+
+---
+
+## 🔋 Power Distribution
+
+### Voltage Levels
+
+```
+7.4V Li-Po Battery (2S)
+        │
+        ├──► Motors (via L298N) [7.4V]
+        │
+        ├──► Buck Converter #1 → Arduino [5V, 1A]
+        │
+        └──► Buck Converter #2 → GPS & Bluetooth [5V, 0.5A]
+```
+
+### Current Draw Estimates
+
+| Component | Current (mA) | Notes |
+|-----------|--------------|--------|
+| Arduino Mega | 50-100 | Typical |
+| GPS Module | 50-80 | Active tracking |
+| Bluetooth | 30-40 | Active connection |
+| L298N (idle) | 10 per driver | |
+| Motors (each) | 200-300 | At base speed |
+| **Total (moving)** | **~1500 mA** | All motors running |
+
+### Battery Life Calculation
+
+```
+Battery Capacity: 2200 mAh
+Average Current: ~1500 mA (motors running)
+
+Runtime = 2200 / 1500 ≈ 1.5 hours continuous operation
+
+With 50% duty cycle (stop/start delivery pattern):
+Effective Runtime ≈ 3 hours
+```
+
+---
+
+## 📶 GPS Performance
+
+### NEO-6M Specifications
+
+- **Horizontal Accuracy:** 2.5m CEP (Circular Error Probable)
+- **Update Rate:** 1 Hz (default), configurable up to 5 Hz
+- **Time to First Fix (TTFF):**
+  - Cold start: ~27s
+  - Warm start: ~1s
+  - Hot start: ~1s
+- **Satellites:** Tracks up to 22 simultaneously
+
+### Accuracy Considerations
+
+```
+GPS Accuracy: ±2.5m
+Waypoint Threshold: 3m
+
+Worst case scenario:
+- Robot actual position: ±2.5m error
+- Target waypoint: ±2.5m error
+- Total potential error: ±5m
+
+Solution: Use 3m threshold for reliable arrival detection
+```
+
+---
+
+## 🚀 Upgrade Path to Prototype 2 (ROS + Lidar)
+
+### Architecture Comparison
+
+| Feature | Prototype 1 (Current) | Prototype 2 (ROS) |
+|---------|----------------------|--------------------|
+| Brain | Arduino Mega | Raspberry Pi 4 |
+| Navigation | GPS waypoints | GPS + SLAM |
+| Obstacle Detection | None | RPLidar A1 |
+| Localization | GPS only | GPS + IMU + Odometry |
+| Mapping | None | Real-time 2D map |
+| Framework | Arduino C++ | ROS Noetic/Melodic |
+| Control | Direct motor control | ROS Navigation Stack |
+
+### ROS Node Architecture (Future)
+
+```
+/gps_node → publishes GPS data
+    ↓
+/localization_node → fuses GPS + IMU + odometry
+    ↓
+/navigation_node → path planning (A*, DWA)
+    ↓
+/motor_control_node → Arduino bridge
+    ↓
+Arduino (motor driver)
+```
+
+---
+
+## 📐 Performance Specifications
+
+### Speed
+- **Maximum Speed:** ~0.5 m/s (1.8 km/h) at BASE_SPEED=200
+- **Turn Rate:** ~45°/second
+- **Acceleration:** Instant (no ramping in current design)
+
+### Navigation
+- **Waypoint Accuracy:** ±3 meters
+- **Path Type:** Direct line-of-sight (no obstacle avoidance)
+- **Update Cycle:** 1 Hz (limited by GPS)
+
+### Communication
+- **Bluetooth Range:** ~10 meters (line of sight)
+- **Latency:** <100ms command response
+- **Baud Rate:** 9600 bps (sufficient for commands)
+
+---
+
+## 🐛 Error Handling
+
+### GPS Loss
+```
+if (!gps.location.isValid()) {
+    stopMotors();
+    // Wait for fix recovery
+}
+```
+
+### Bluetooth Disconnection
+- Robot continues last command (manual mode)
+- Completes waypoint navigation (autonomous mode)
+- Status LED blinks rapidly
+
+### Low Battery (Future Enhancement)
+- Add voltage divider to monitor battery
+- Return to home waypoint at <20% capacity
+
+---
+
+## 📱 Recommended Mobile Apps
+
+For Bluetooth control, use any Bluetooth Serial Terminal app:
+
+### Android
+1. **Serial Bluetooth Terminal** (Free)
+   - https://play.google.com/store/apps/details?id=de.kai_morich.serial_bluetooth_terminal
+   
+2. **Bluetooth Terminal HC-05** (Free)
+
+### iOS
+1. **BLE Terminal** (Free)
+2. **Bluefruit Connect** (Free, by Adafruit)
+
+**Configuration:**
+- Pair with HC-05 (default PIN: 1234 or 0000)
+- Set line ending to "Newline (\n)"
+- Baud rate: 9600
+
+---
+
+*This architecture is designed for simplicity and reliability for courier/logistics applications*
