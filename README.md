@@ -1,4 +1,4 @@
-# 🤖 RASCAL  
+# 🤖 R.A.S.C.A.L  
 ### Robotic Autonomous Servant for Courier & Logistics
 
 ## 🚀 Overview
