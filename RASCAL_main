@@ -1,0 +1,490 @@
+/*
+ * RASCAL - Autonomous Delivery Robot
+ * Arduino-based courier robot with GPS navigation and Bluetooth control
+ * 
+ * Features:
+ * - Manual control via Bluetooth (mobile app)
+ * - Autonomous GPS waypoint navigation
+ * - 4-wheel drive with TT motors
+ * - Real-time position tracking
+ * 
+ * Hardware:
+ * - Arduino Mega 2560
+ * - L298N Motor Driver
+ * - HC-05 Bluetooth Module
+ * - NEO-6M GPS Module
+ * - 4x TT DC Motors (3-6V)
+ */
+
+#include <TinyGPSPlus.h>
+#include <SoftwareSerial.h>
+
+// ==================== PIN DEFINITIONS ====================
+// Motor Driver L298N Pins
+#define MOTOR_FL_IN1 22  // Front Left Motor
+#define MOTOR_FL_IN2 23
+#define MOTOR_FL_EN 2    // PWM pin
+
+#define MOTOR_FR_IN1 24  // Front Right Motor
+#define MOTOR_FR_IN2 25
+#define MOTOR_FR_EN 3    // PWM pin
+
+#define MOTOR_BL_IN1 26  // Back Left Motor
+#define MOTOR_BL_IN2 27
+#define MOTOR_BL_EN 4    // PWM pin
+
+#define MOTOR_BR_IN1 28  // Back Right Motor
+#define MOTOR_BR_IN2 29
+#define MOTOR_BR_EN 5    // PWM pin
+
+// GPS Module (NEO-6M)
+#define GPS_RX 10
+#define GPS_TX 11
+
+// Bluetooth Module (HC-05)
+#define BT_RX 18  // Connect to HC-05 TX
+#define BT_TX 19  // Connect to HC-05 RX
+
+// Status LED
+#define LED_STATUS 13
+
+// ==================== CONFIGURATION ====================
+#define BASE_SPEED 200        // Base motor speed (0-255)
+#define TURN_SPEED 180        // Speed during turns
+#define GPS_UPDATE_RATE 1000  // GPS read interval (ms)
+#define WAYPOINT_THRESHOLD 3.0 // Distance threshold to consider waypoint reached (meters)
+#define HEADING_THRESHOLD 15   // Heading tolerance in degrees
+
+// ==================== GLOBAL OBJECTS ====================
+TinyGPSPlus gps;
+SoftwareSerial gpsSerial(GPS_RX, GPS_TX);
+SoftwareSerial btSerial(BT_RX, BT_TX);
+
+// ==================== ROBOT STATE ====================
+enum RobotMode {
+  MODE_MANUAL,
+  MODE_AUTONOMOUS,
+  MODE_STOPPED
+};
+
+RobotMode currentMode = MODE_STOPPED;
+
+// Current position
+double currentLat = 0.0;
+double currentLon = 0.0;
+double currentHeading = 0.0;
+
+// Target waypoint for autonomous mode
+double targetLat = 0.0;
+double targetLon = 0.0;
+bool hasWaypoint = false;
+
+// Previous position for heading calculation
+double prevLat = 0.0;
+double prevLon = 0.0;
+
+unsigned long lastGPSUpdate = 0;
+unsigned long lastStatusBlink = 0;
+bool statusLedState = false;
+
+// ==================== SETUP ====================
+void setup() {
+  // Initialize serial communications
+  Serial.begin(9600);      // Debug serial
+  gpsSerial.begin(9600);   // GPS module
+  btSerial.begin(9600);    // Bluetooth module
+  
+  // Initialize motor pins
+  pinMode(MOTOR_FL_IN1, OUTPUT);
+  pinMode(MOTOR_FL_IN2, OUTPUT);
+  pinMode(MOTOR_FL_EN, OUTPUT);
+  
+  pinMode(MOTOR_FR_IN1, OUTPUT);
+  pinMode(MOTOR_FR_IN2, OUTPUT);
+  pinMode(MOTOR_FR_EN, OUTPUT);
+  
+  pinMode(MOTOR_BL_IN1, OUTPUT);
+  pinMode(MOTOR_BL_IN2, OUTPUT);
+  pinMode(MOTOR_BL_EN, OUTPUT);
+  
+  pinMode(MOTOR_BR_IN1, OUTPUT);
+  pinMode(MOTOR_BR_IN2, OUTPUT);
+  pinMode(MOTOR_BR_EN, OUTPUT);
+  
+  pinMode(LED_STATUS, OUTPUT);
+  
+  // Stop all motors initially
+  stopMotors();
+  
+  Serial.println("RASCAL Autonomous Delivery Robot");
+  Serial.println("Initializing...");
+  Serial.println("Waiting for GPS fix...");
+  
+  // Send ready signal via Bluetooth
+  btSerial.println("RASCAL:READY");
+}
+
+// ==================== MAIN LOOP ====================
+void loop() {
+  // Update GPS data
+  updateGPS();
+  
+  // Process Bluetooth commands
+  processBluetoothCommands();
+  
+  // Execute autonomous navigation if in autonomous mode
+  if (currentMode == MODE_AUTONOMOUS && hasWaypoint) {
+    autonomousNavigation();
+  }
+  
+  // Blink status LED
+  if (millis() - lastStatusBlink > 500) {
+    statusLedState = !statusLedState;
+    digitalWrite(LED_STATUS, statusLedState);
+    lastStatusBlink = millis();
+  }
+  
+  // Send status update via Bluetooth every 2 seconds
+  static unsigned long lastStatusSend = 0;
+  if (millis() - lastStatusSend > 2000) {
+    sendStatus();
+    lastStatusSend = millis();
+  }
+}
+
+// ==================== GPS FUNCTIONS ====================
+void updateGPS() {
+  while (gpsSerial.available() > 0) {
+    char c = gpsSerial.read();
+    gps.encode(c);
+  }
+  
+  if (millis() - lastGPSUpdate > GPS_UPDATE_RATE) {
+    if (gps.location.isValid()) {
+      prevLat = currentLat;
+      prevLon = currentLon;
+      
+      currentLat = gps.location.lat();
+      currentLon = gps.location.lng();
+      
+      // Calculate heading from movement
+      if (prevLat != 0.0 && prevLon != 0.0) {
+        currentHeading = calculateBearing(prevLat, prevLon, currentLat, currentLon);
+      }
+      
+      lastGPSUpdate = millis();
+    }
+  }
+}
+
+// ==================== BLUETOOTH COMMAND PROCESSING ====================
+void processBluetoothCommands() {
+  if (btSerial.available() > 0) {
+    String command = btSerial.readStringUntil('\n');
+    command.trim();
+    
+    Serial.print("BT Command: ");
+    Serial.println(command);
+    
+    // Manual control commands
+    if (command == "FWD") {
+      currentMode = MODE_MANUAL;
+      moveForward(BASE_SPEED);
+    }
+    else if (command == "BWD") {
+      currentMode = MODE_MANUAL;
+      moveBackward(BASE_SPEED);
+    }
+    else if (command == "LEFT") {
+      currentMode = MODE_MANUAL;
+      turnLeft(TURN_SPEED);
+    }
+    else if (command == "RIGHT") {
+      currentMode = MODE_MANUAL;
+      turnRight(TURN_SPEED);
+    }
+    else if (command == "STOP") {
+      currentMode = MODE_STOPPED;
+      stopMotors();
+    }
+    // Set waypoint: "GOTO:LAT,LON"
+    else if (command.startsWith("GOTO:")) {
+      String coords = command.substring(5);
+      int commaIndex = coords.indexOf(',');
+      if (commaIndex > 0) {
+        targetLat = coords.substring(0, commaIndex).toDouble();
+        targetLon = coords.substring(commaIndex + 1).toDouble();
+        hasWaypoint = true;
+        currentMode = MODE_AUTONOMOUS;
+        btSerial.println("WAYPOINT:SET");
+        Serial.print("Waypoint set: ");
+        Serial.print(targetLat, 6);
+        Serial.print(", ");
+        Serial.println(targetLon, 6);
+      }
+    }
+    // Clear waypoint
+    else if (command == "CLEAR") {
+      hasWaypoint = false;
+      currentMode = MODE_STOPPED;
+      stopMotors();
+      btSerial.println("WAYPOINT:CLEARED");
+    }
+    // Get current position
+    else if (command == "POS") {
+      sendStatus();
+    }
+    // Set speed: "SPEED:0-255"
+    else if (command.startsWith("SPEED:")) {
+      int speed = command.substring(6).toInt();
+      if (speed >= 0 && speed <= 255) {
+        // This could be stored in a global variable
+        btSerial.print("SPEED:SET:");
+        btSerial.println(speed);
+      }
+    }
+  }
+}
+
+// ==================== AUTONOMOUS NAVIGATION ====================
+void autonomousNavigation() {
+  if (!gps.location.isValid()) {
+    stopMotors();
+    return;
+  }
+  
+  // Calculate distance to waypoint
+  double distanceToWaypoint = calculateDistance(currentLat, currentLon, targetLat, targetLon);
+  
+  // Check if waypoint reached
+  if (distanceToWaypoint < WAYPOINT_THRESHOLD) {
+    stopMotors();
+    hasWaypoint = false;
+    currentMode = MODE_STOPPED;
+    btSerial.println("WAYPOINT:REACHED");
+    Serial.println("Waypoint reached!");
+    return;
+  }
+  
+  // Calculate bearing to waypoint
+  double bearingToWaypoint = calculateBearing(currentLat, currentLon, targetLat, targetLon);
+  
+  // Calculate heading error
+  double headingError = bearingToWaypoint - currentHeading;
+  
+  // Normalize heading error to -180 to 180
+  while (headingError > 180) headingError -= 360;
+  while (headingError < -180) headingError += 360;
+  
+  Serial.print("Distance: ");
+  Serial.print(distanceToWaypoint);
+  Serial.print("m, Bearing: ");
+  Serial.print(bearingToWaypoint);
+  Serial.print("°, Heading: ");
+  Serial.print(currentHeading);
+  Serial.print("°, Error: ");
+  Serial.print(headingError);
+  Serial.println("°");
+  
+  // Navigate based on heading error
+  if (abs(headingError) < HEADING_THRESHOLD) {
+    // Heading is good, move forward
+    moveForward(BASE_SPEED);
+  }
+  else if (headingError > 0) {
+    // Turn right
+    turnRight(TURN_SPEED);
+  }
+  else {
+    // Turn left
+    turnLeft(TURN_SPEED);
+  }
+}
+
+// ==================== MOTOR CONTROL FUNCTIONS ====================
+void moveForward(int speed) {
+  // Front Left
+  digitalWrite(MOTOR_FL_IN1, HIGH);
+  digitalWrite(MOTOR_FL_IN2, LOW);
+  analogWrite(MOTOR_FL_EN, speed);
+  
+  // Front Right
+  digitalWrite(MOTOR_FR_IN1, HIGH);
+  digitalWrite(MOTOR_FR_IN2, LOW);
+  analogWrite(MOTOR_FR_EN, speed);
+  
+  // Back Left
+  digitalWrite(MOTOR_BL_IN1, HIGH);
+  digitalWrite(MOTOR_BL_IN2, LOW);
+  analogWrite(MOTOR_BL_EN, speed);
+  
+  // Back Right
+  digitalWrite(MOTOR_BR_IN1, HIGH);
+  digitalWrite(MOTOR_BR_IN2, LOW);
+  analogWrite(MOTOR_BR_EN, speed);
+}
+
+void moveBackward(int speed) {
+  // Front Left
+  digitalWrite(MOTOR_FL_IN1, LOW);
+  digitalWrite(MOTOR_FL_IN2, HIGH);
+  analogWrite(MOTOR_FL_EN, speed);
+  
+  // Front Right
+  digitalWrite(MOTOR_FR_IN1, LOW);
+  digitalWrite(MOTOR_FR_IN2, HIGH);
+  analogWrite(MOTOR_FR_EN, speed);
+  
+  // Back Left
+  digitalWrite(MOTOR_BL_IN1, LOW);
+  digitalWrite(MOTOR_BL_IN2, HIGH);
+  analogWrite(MOTOR_BL_EN, speed);
+  
+  // Back Right
+  digitalWrite(MOTOR_BR_IN1, LOW);
+  digitalWrite(MOTOR_BR_IN2, HIGH);
+  analogWrite(MOTOR_BR_EN, speed);
+}
+
+void turnLeft(int speed) {
+  // Left motors backward
+  digitalWrite(MOTOR_FL_IN1, LOW);
+  digitalWrite(MOTOR_FL_IN2, HIGH);
+  analogWrite(MOTOR_FL_EN, speed);
+  
+  digitalWrite(MOTOR_BL_IN1, LOW);
+  digitalWrite(MOTOR_BL_IN2, HIGH);
+  analogWrite(MOTOR_BL_EN, speed);
+  
+  // Right motors forward
+  digitalWrite(MOTOR_FR_IN1, HIGH);
+  digitalWrite(MOTOR_FR_IN2, LOW);
+  analogWrite(MOTOR_FR_EN, speed);
+  
+  digitalWrite(MOTOR_BR_IN1, HIGH);
+  digitalWrite(MOTOR_BR_IN2, LOW);
+  analogWrite(MOTOR_BR_EN, speed);
+}
+
+void turnRight(int speed) {
+  // Left motors forward
+  digitalWrite(MOTOR_FL_IN1, HIGH);
+  digitalWrite(MOTOR_FL_IN2, LOW);
+  analogWrite(MOTOR_FL_EN, speed);
+  
+  digitalWrite(MOTOR_BL_IN1, HIGH);
+  digitalWrite(MOTOR_BL_IN2, LOW);
+  analogWrite(MOTOR_BL_EN, speed);
+  
+  // Right motors backward
+  digitalWrite(MOTOR_FR_IN1, LOW);
+  digitalWrite(MOTOR_FR_IN2, HIGH);
+  analogWrite(MOTOR_FR_EN, speed);
+  
+  digitalWrite(MOTOR_BR_IN1, LOW);
+  digitalWrite(MOTOR_BR_IN2, HIGH);
+  analogWrite(MOTOR_BR_EN, speed);
+}
+
+void stopMotors() {
+  digitalWrite(MOTOR_FL_IN1, LOW);
+  digitalWrite(MOTOR_FL_IN2, LOW);
+  analogWrite(MOTOR_FL_EN, 0);
+  
+  digitalWrite(MOTOR_FR_IN1, LOW);
+  digitalWrite(MOTOR_FR_IN2, LOW);
+  analogWrite(MOTOR_FR_EN, 0);
+  
+  digitalWrite(MOTOR_BL_IN1, LOW);
+  digitalWrite(MOTOR_BL_IN2, LOW);
+  analogWrite(MOTOR_BL_EN, 0);
+  
+  digitalWrite(MOTOR_BR_IN1, LOW);
+  digitalWrite(MOTOR_BR_IN2, LOW);
+  analogWrite(MOTOR_BR_EN, 0);
+}
+
+// ==================== NAVIGATION CALCULATIONS ====================
+// Calculate distance between two GPS coordinates (Haversine formula)
+double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+  const double R = 6371000; // Earth radius in meters
+  
+  double dLat = radians(lat2 - lat1);
+  double dLon = radians(lon2 - lon1);
+  
+  double a = sin(dLat/2) * sin(dLat/2) +
+             cos(radians(lat1)) * cos(radians(lat2)) *
+             sin(dLon/2) * sin(dLon/2);
+  
+  double c = 2 * atan2(sqrt(a), sqrt(1-a));
+  
+  return R * c; // Distance in meters
+}
+
+// Calculate bearing between two GPS coordinates
+double calculateBearing(double lat1, double lon1, double lat2, double lon2) {
+  double dLon = radians(lon2 - lon1);
+  double y = sin(dLon) * cos(radians(lat2));
+  double x = cos(radians(lat1)) * sin(radians(lat2)) -
+             sin(radians(lat1)) * cos(radians(lat2)) * cos(dLon);
+  
+  double bearing = degrees(atan2(y, x));
+  
+  // Normalize to 0-360
+  bearing = fmod((bearing + 360.0), 360.0);
+  
+  return bearing;
+}
+
+double radians(double degrees) {
+  return degrees * PI / 180.0;
+}
+
+double degrees(double radians) {
+  return radians * 180.0 / PI;
+}
+
+// ==================== STATUS REPORTING ====================
+void sendStatus() {
+  btSerial.print("STATUS:");
+  
+  // Mode
+  if (currentMode == MODE_MANUAL) btSerial.print("MANUAL");
+  else if (currentMode == MODE_AUTONOMOUS) btSerial.print("AUTO");
+  else btSerial.print("STOPPED");
+  
+  btSerial.print("|");
+  
+  // GPS position
+  if (gps.location.isValid()) {
+    btSerial.print(currentLat, 6);
+    btSerial.print(",");
+    btSerial.print(currentLon, 6);
+  } else {
+    btSerial.print("NO_GPS");
+  }
+  
+  btSerial.print("|");
+  
+  // Satellites
+  btSerial.print("SAT:");
+  btSerial.print(gps.satellites.value());
+  
+  btSerial.print("|");
+  
+  // Heading
+  btSerial.print("HDG:");
+  btSerial.print(currentHeading, 1);
+  
+  if (hasWaypoint) {
+    btSerial.print("|");
+    btSerial.print("WP:");
+    btSerial.print(targetLat, 6);
+    btSerial.print(",");
+    btSerial.print(targetLon, 6);
+    btSerial.print("|DIST:");
+    btSerial.print(calculateDistance(currentLat, currentLon, targetLat, targetLon), 1);
+  }
+  
+  btSerial.println();
+}
