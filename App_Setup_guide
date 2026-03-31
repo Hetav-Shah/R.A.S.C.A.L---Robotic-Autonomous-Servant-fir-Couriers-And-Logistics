@@ -1,0 +1,825 @@
+# RASCAL - Complete Setup Guide
+
+## 🚀 Quick Start Overview
+
+This guide will take you from unboxed components to a fully functional autonomous delivery robot.
+
+**Total Setup Time:** 8-10 hours (first build)  
+**Difficulty Level:** Intermediate  
+**Required Skills:** Basic soldering, Arduino programming, hardware assembly
+
+---
+
+## 📦 Before You Begin
+
+### Tools Checklist
+- [ ] Soldering iron and solder
+- [ ] Wire stripper/cutter
+- [ ] Multimeter
+- [ ] Screwdriver set (Phillips #1, #2)
+- [ ] Hot glue gun (optional)
+- [ ] Helping hands/PCB holder
+- [ ] Safety glasses
+
+### Software Requirements
+- [ ] Arduino IDE 1.8.19 or 2.x
+- [ ] USB Type-B cable (for Arduino Mega)
+- [ ] Bluetooth Terminal app on phone
+
+### Component Verification
+Unpack and verify all components from BOM:
+- [ ] Arduino Mega 2560
+- [ ] 4x TT Motors with wheels
+- [ ] 2x L298N Motor Drivers
+- [ ] HC-05 Bluetooth Module
+- [ ] NEO-6M GPS Module
+- [ ] 7.4V Li-Po Battery & Charger
+- [ ] 2x Buck Converters (LM2596)
+- [ ] Robot chassis
+- [ ] Jumper wires, connectors, hardware
+
+---
+
+## 🔧 PART 1: HARDWARE ASSEMBLY
+
+### Step 1: Prepare the Chassis (30 min)
+
+1. **Unpack the chassis kit**
+   - Lay out acrylic layers
+   - Organize screws, standoffs, nuts
+
+2. **Mount motors to chassis**
+   ```
+   Position: One motor at each corner
+   Orientation: Motor body inside, shaft pointing outward
+   Fasteners: Use M3 x 8mm screws and nuts
+   ```
+
+3. **Attach wheels**
+   - Press-fit wheels onto motor shafts
+   - If loose, add drop of hot glue
+
+4. **Install standoffs**
+   - Create 2-level platform using M3 x 25mm standoffs
+   - Bottom level: Motor drivers, buck converters
+   - Top level: Arduino, GPS, battery
+
+**✓ Checkpoint:** Robot should have 4 wheels, stand level, motors secure
+
+---
+
+### Step 2: Configure Buck Converters (20 min)
+
+**⚠️ CRITICAL STEP** - Incorrect voltage will damage components!
+
+1. **Set up test environment**
+   - Connect 7.4V battery to buck converter input (+/- terminals)
+   - DO NOT connect output yet
+
+2. **Adjust Buck Converter #1**
+   - Turn multimeter to DC voltage mode
+   - Probe buck converter output terminals
+   - Use small screwdriver on blue potentiometer
+   - Turn clockwise to increase voltage
+   - **Target: Exactly 5.0V (±0.1V)**
+
+3. **Adjust Buck Converter #2**
+   - Repeat process for second converter
+   - **Target: Exactly 5.0V (±0.1V)**
+
+4. **Label converters**
+   - Buck #1: "Arduino Power"
+   - Buck #2: "GPS & Bluetooth Power"
+
+**✓ Checkpoint:** Both converters output 5.0V when connected to battery
+
+---
+
+### Step 3: Power Distribution (45 min)
+
+1. **Prepare battery connector**
+   ```
+   Battery (+) ───[XT60]───[Switch]───┬─── Split to 4 destinations
+   Battery (-) ───[XT60]───────────────┴─── Common ground
+   ```
+
+2. **Install power switch**
+   - Cut positive battery wire
+   - Solder switch in series
+   - Use heat shrink tubing on connections
+
+3. **Create power bus**
+   Using breadboard or terminal strip:
+   ```
+   Positive (+7.4V) Bus:
+   ├─► L298N #1 (+12V terminal)
+   ├─► L298N #2 (+12V terminal)
+   ├─► Buck Converter #1 (Input +)
+   └─► Buck Converter #2 (Input +)
+   
+   Ground (GND) Bus:
+   ├─► L298N #1 (GND)
+   ├─► L298N #2 (GND)
+   ├─► Buck #1 (Input -)
+   └─► Buck #2 (Input -)
+   ```
+
+4. **Test power system**
+   - Turn on power switch
+   - Measure:
+     * Battery voltage: 7.4-8.4V
+     * Buck #1 output: 5.0V
+     * Buck #2 output: 5.0V
+   - Turn off when done
+
+**✓ Checkpoint:** All power rails stable, no smoke or hot components
+
+---
+
+### Step 4: Motor Driver Setup (60 min)
+
+1. **Prepare L298N #1 (Front Motors)**
+   - Remove 5V enable jumper (if present)
+   - Connect to power bus:
+     * +12V → Battery positive bus
+     * GND → Ground bus
+
+2. **Connect Front Left Motor**
+   ```
+   Motor red wire (+) → L298N OUT1
+   Motor black wire (-) → L298N OUT2
+   ```
+
+3. **Connect Front Right Motor**
+   ```
+   Motor red wire (+) → L298N OUT3
+   Motor black wire (-) → L298N OUT4
+   ```
+
+4. **Prepare L298N #2 (Back Motors)**
+   - Remove 5V enable jumper
+   - Connect to power bus
+   - Wire Back Left to OUT1/OUT2
+   - Wire Back Right to OUT3/OUT4
+
+5. **Secure motor drivers to chassis**
+   - Mount on bottom level
+   - Use M3 screws or double-sided tape
+   - Ensure heat sinks have airflow
+
+**✓ Checkpoint:** All 4 motors connected, drivers powered, no loose wires
+
+---
+
+### Step 5: Arduino Mounting & Power (30 min)
+
+1. **Mount Arduino Mega**
+   - Place on top chassis level
+   - Secure with M3 x 6mm screws and standoffs
+   - Ensure USB port accessible
+
+2. **Connect Arduino power**
+   ```
+   Buck Converter #1 (+5V) → Arduino VIN pin
+   Buck Converter #1 (GND)  → Arduino GND pin
+   ```
+
+3. **Test Arduino power**
+   - Turn on main power switch
+   - Arduino built-in LED should light up
+   - Measure voltage at Arduino 5V pin: should be 5.0V
+   - Turn off power
+
+**⚠️ IMPORTANT:** Once motors are connected, NEVER power Arduino via USB simultaneously
+
+**✓ Checkpoint:** Arduino powers on with battery, built-in LED glows
+
+---
+
+### Step 6: Motor Control Wiring (90 min)
+
+Use female-to-male jumper wires for all connections.
+
+#### Front Motors (L298N #1)
+
+```
+Arduino → L298N #1
+───────────────────────
+D22 → IN1  (FL Direction 1)
+D23 → IN2  (FL Direction 2)
+D2  → ENA  (FL Speed PWM)
+
+D24 → IN3  (FR Direction 1)
+D25 → IN4  (FR Direction 2)
+D3  → ENB  (FR Speed PWM)
+
+GND → GND  (Common ground)
+5V  → 5V   (Logic power)
+```
+
+#### Back Motors (L298N #2)
+
+```
+Arduino → L298N #2
+───────────────────────
+D26 → IN1  (BL Direction 1)
+D27 → IN2  (BL Direction 2)
+D4  → ENA  (BL Speed PWM)
+
+D28 → IN3  (BR Direction 1)
+D29 → IN4  (BR Direction 2)
+D5  → ENB  (BR Speed PWM)
+
+GND → GND  (Common ground)
+5V  → 5V   (Logic power)
+```
+
+**Organization Tips:**
+- Use different color wires for PWM (yellow) vs digital (orange)
+- Bundle wires with zip ties
+- Label each wire with tape
+- Keep wires away from moving parts (wheels)
+
+**✓ Checkpoint:** All 20 wires connected, no loose connections, organized routing
+
+---
+
+### Step 7: GPS Module Installation (30 min)
+
+1. **Mount GPS on top surface**
+   - Use double-sided foam tape
+   - Position: Center or front of robot
+   - **CRITICAL:** Ceramic antenna must face sky (upward)
+   - No metal objects above antenna
+
+2. **Connect GPS to power**
+   ```
+   GPS VCC → Buck Converter #2 (+5V output)
+   GPS GND → Common ground bus
+   ```
+
+3. **Connect GPS serial**
+   ```
+   GPS TX  → Arduino D10  (GPS transmits, Arduino receives)
+   GPS RX  → Arduino D11  (Arduino transmits, GPS receives)
+   ```
+
+**✓ Checkpoint:** GPS module secure, antenna pointing up, 4 wires connected
+
+---
+
+### Step 8: Bluetooth Module with Voltage Divider (60 min)
+
+**⚠️ CRITICAL:** HC-05 RX is 3.3V logic, Arduino outputs 5V. Direct connection will damage HC-05!
+
+#### Build Voltage Divider Circuit
+
+1. **Gather components:**
+   - 1x 1kΩ resistor (brown-black-red)
+   - 1x 2kΩ resistor (red-black-red)
+   - Small breadboard or protoboard
+
+2. **Solder voltage divider:**
+   ```
+   Arduino D18 (5V signal)
+        │
+        ├─── To Arduino pin
+        │
+     [1kΩ R1]
+        │
+        ├────► HC-05 RX (3.3V safe)
+        │
+     [2kΩ R2]
+        │
+       GND
+   
+   Voltage at HC-05 RX = 5V × (2k / (1k + 2k)) = 3.33V ✓
+   ```
+
+3. **Verify with multimeter:**
+   - Apply 5V to R1 input
+   - Measure voltage at junction (HC-05 RX point)
+   - Should read: 3.2-3.4V
+
+#### Connect HC-05 Module
+
+```
+HC-05 VCC → Buck Converter #2 (+5V)
+HC-05 GND → Common ground
+HC-05 TX  → Arduino D19 (direct, 3.3V is safe for Arduino)
+HC-05 RX  → Voltage divider output (from D18)
+```
+
+**✓ Checkpoint:** Voltage divider outputs 3.3V, HC-05 connected, secured to chassis
+
+---
+
+### Step 9: Battery Mounting & Final Assembly (20 min)
+
+1. **Mount battery**
+   - Position: Center of chassis for balanced weight
+   - Method: Heavy-duty velcro straps
+   - Orientation: Connector accessible for charging
+
+2. **Cable management**
+   - Bundle and secure all wires with zip ties
+   - Ensure no wires near:
+     * Moving wheels
+     * Motor shafts
+     * Sharp edges
+   - Leave GPS antenna area clear
+
+3. **Final visual inspection**
+   - [ ] All connections secure
+   - [ ] No exposed wire (use electrical tape)
+   - [ ] Components not touching each other
+   - [ ] Battery strapped firmly
+   - [ ] Power switch accessible
+   - [ ] USB port accessible
+
+**✓ Checkpoint:** Robot mechanically complete, professional appearance, safe
+
+---
+
+## 💻 PART 2: SOFTWARE SETUP
+
+### Step 10: Arduino IDE Installation (15 min)
+
+1. **Download Arduino IDE**
+   - Visit: https://www.arduino.cc/en/software
+   - Choose version for your OS (Windows/Mac/Linux)
+   - Install with default settings
+
+2. **Launch Arduino IDE**
+   - Connect Arduino Mega via USB (DO NOT turn on battery power)
+   - Go to Tools → Board → Arduino AVR Boards → Arduino Mega 2560
+   - Go to Tools → Port → Select COM port (Windows) or /dev/ttyUSB* (Linux)
+
+3. **Test connection**
+   - File → Examples → 01.Basics → Blink
+   - Click Upload (arrow button)
+   - Built-in LED should blink
+
+**✓ Checkpoint:** Arduino IDE installed, board communicates, Blink sketch works
+
+---
+
+### Step 11: Install Required Libraries (10 min)
+
+1. **TinyGPSPlus Library**
+   - Arduino IDE → Sketch → Include Library → Manage Libraries
+   - Search: "TinyGPSPlus"
+   - Install by Mikal Hart
+
+2. **SoftwareSerial Library**
+   - Usually pre-installed with Arduino IDE
+   - Verify: Sketch → Include Library → Should see "SoftwareSerial"
+
+**✓ Checkpoint:** Libraries installed, no errors in Library Manager
+
+---
+
+### Step 12: Upload RASCAL Code (15 min)
+
+1. **Open RASCAL_Main.ino**
+   - Navigate to /app/arduino/RASCAL_Main/
+   - Double-click RASCAL_Main.ino
+   - Arduino IDE opens with code
+
+2. **Verify code**
+   - Click checkmark button (Verify)
+   - Should compile without errors
+   - Note: Warnings are OK
+
+3. **Upload to Arduino**
+   - Ensure Arduino connected via USB
+   - Battery power: OFF
+   - Click arrow button (Upload)
+   - Wait for "Done uploading" message
+
+4. **Check Serial Monitor**
+   - Tools → Serial Monitor
+   - Set baud rate: 9600
+   - Should see:
+     ```
+     RASCAL Autonomous Delivery Robot
+     Initializing...
+     Waiting for GPS fix...
+     ```
+
+**✓ Checkpoint:** Code uploaded successfully, Serial Monitor shows startup messages
+
+---
+
+## ⚡ PART 3: TESTING & CALIBRATION
+
+### Step 13: Power System Test (10 min)
+
+1. **Disconnect USB**
+   - Unplug USB cable from Arduino
+
+2. **Power on with battery**
+   - Turn main power switch ON
+   - Arduino built-in LED should light
+   - No smoke, sparks, or burning smell
+
+3. **Measure voltages**
+   - Battery: 7.4-8.4V (depending on charge)
+   - Arduino 5V pin: 5.0V
+   - GPS/Bluetooth 5V rail: 5.0V
+
+4. **Listen for startup sound**
+   - HC-05 LED should blink (pairing mode)
+   - GPS LED should blink (searching for satellites)
+
+**⚠️ If anything wrong:** Power off immediately, check wiring
+
+**✓ Checkpoint:** All voltages correct, no issues, components powered
+
+---
+
+### Step 14: Motor Direction Test (30 min)
+
+**Purpose:** Verify each motor spins correct direction
+
+1. **Prepare test environment**
+   - Place robot on blocks (wheels off ground)
+   - Battery power: ON
+   - Have power switch easily accessible
+
+2. **Connect Serial Monitor**
+   - Reconnect USB (for debugging)
+   - Open Serial Monitor (9600 baud)
+
+3. **Connect via Bluetooth**
+   - On phone: Install "Serial Bluetooth Terminal"
+   - Bluetooth Settings → Pair with "HC-05"
+     * PIN: 1234 or 0000
+   - Open app → Connect to HC-05
+   - Should see: "RASCAL:READY"
+
+4. **Test each command**
+
+   **Send: `FWD`**
+   - All 4 wheels should spin forward
+   - If any backward: Note which motor
+
+   **Send: `BWD`**
+   - All 4 wheels should spin backward
+
+   **Send: `LEFT`**
+   - Left wheels backward, right wheels forward
+   - Robot should turn left
+
+   **Send: `RIGHT`**
+   - Left wheels forward, right wheels backward
+   - Robot should turn right
+
+   **Send: `STOP`**
+   - All motors stop
+
+5. **Fix incorrect directions**
+   - Power off
+   - Swap motor +/- wires for reversed motors
+   - Retest
+
+**✓ Checkpoint:** All motors spin correct direction for all commands
+
+---
+
+### Step 15: GPS Fix Test (20 min)
+
+1. **Move robot outdoors**
+   - Open sky view (no trees, buildings overhead)
+   - Power on
+
+2. **Wait for GPS lock**
+   - Cold start: 30-60 seconds
+   - GPS LED will change from blinking to solid (or different pattern)
+   - Watch Serial Monitor (if USB connected)
+
+3. **Verify GPS data**
+   - Send Bluetooth command: `POS`
+   - Should receive:
+     ```
+     STATUS:STOPPED|[Latitude],[Longitude]|SAT:8|HDG:0.0
+     ```
+   - Latitude/Longitude should be your actual location
+   - Satellites: Minimum 4, good fix: 8+
+
+4. **Check accuracy**
+   - Compare GPS coordinates to Google Maps
+   - Should be within 2-5 meters
+
+**🚨 Troubleshooting:**
+- No fix after 2 min: Check GPS antenna facing up, no metal blocking
+- Wrong location: GPS may need calibration (let run for 5 min)
+- 0 satellites: Check wiring, GPS power (5V)
+
+**✓ Checkpoint:** GPS acquires fix, reports accurate location
+
+---
+
+### Step 16: Autonomous Navigation Test (30 min)
+
+**⚠️ IMPORTANT:** Test in safe, open area (parking lot, field) away from people/traffic
+
+1. **Get current position**
+   - Send: `POS`
+   - Note latitude and longitude
+   - Example: 37.774929, -122.419416
+
+2. **Set test waypoint (10m away)**
+   - Add 0.0001 to latitude (moves ~11m north)
+   - Example target: 37.775029, -122.419416
+   - Send: `GOTO:37.775029,-122.419416`
+   - Response: "WAYPOINT:SET"
+
+3. **Place robot on ground**
+   - Ensure clear path ahead
+   - Robot should start moving automatically
+
+4. **Observe behavior**
+   - Robot calculates bearing
+   - Turns to face waypoint
+   - Moves forward
+   - Adjusts heading as needed
+   - Stops within 3m of waypoint
+   - Sends: "WAYPOINT:REACHED"
+
+5. **Monitor via Bluetooth**
+   - Every 2 seconds: STATUS update
+   - Shows: mode, position, distance to waypoint
+
+6. **Test stop command**
+   - While moving, send: `STOP`
+   - Robot should halt immediately
+
+**💡 Pro Tip:** Start with short distances (5-10m) before attempting longer routes
+
+**✓ Checkpoint:** Robot successfully navigates to GPS waypoint, stops at destination
+
+---
+
+### Step 17: Calibration & Tuning (45 min)
+
+#### Speed Calibration
+
+If robot veers left/right when going "straight":
+
+1. **Open RASCAL_Main.ino**
+2. **Find moveForward() function**
+3. **Adjust motor speeds individually:**
+   ```cpp
+   void moveForward(int speed) {
+     // If robot veers right, slow down right motors:
+     analogWrite(MOTOR_FL_EN, speed);       // Left: 200
+     analogWrite(MOTOR_FR_EN, speed - 10);  // Right: 190
+     analogWrite(MOTOR_BL_EN, speed);       // Left: 200
+     analogWrite(MOTOR_BR_EN, speed - 10);  // Right: 190
+   }
+   ```
+4. **Re-upload and test**
+
+#### GPS Accuracy Tuning
+
+1. **Adjust waypoint threshold** (in code):
+   ```cpp
+   #define WAYPOINT_THRESHOLD 3.0  // meters
+   ```
+   - Increase for looser accuracy (5.0m)
+   - Decrease for tighter accuracy (2.0m, but harder to achieve)
+
+2. **Adjust heading tolerance:**
+   ```cpp
+   #define HEADING_THRESHOLD 15  // degrees
+   ```
+   - Increase for less turning (20°)
+   - Decrease for straighter paths (10°)
+
+#### Speed Tuning
+
+```cpp
+#define BASE_SPEED 200      // 0-255, higher = faster
+#define TURN_SPEED 180      // Turn speed
+```
+- Increase for faster delivery
+- Decrease for better accuracy
+
+**✓ Checkpoint:** Robot drives straight, reaches waypoints consistently
+
+---
+
+## 📱 PART 4: MOBILE APP SETUP
+
+### Step 18: Bluetooth Terminal App (10 min)
+
+#### Android: Serial Bluetooth Terminal
+
+1. **Install app**
+   - Google Play Store
+   - Search: "Serial Bluetooth Terminal"
+   - Install by Kai Morich (free)
+
+2. **Configure app**
+   - Settings → Line ending: "Newline (\n)"
+   - Settings → Baud rate: 9600 (not used for Bluetooth, but set anyway)
+
+3. **Pair & Connect**
+   - Phone Bluetooth Settings → Pair with "HC-05" (PIN: 1234)
+   - Open app → Devices → HC-05 → Connect
+   - Should see: "RASCAL:READY"
+
+#### iOS: BLE Terminal
+
+**Note:** HC-05 is classic Bluetooth, not BLE. iOS support limited.
+
+**Alternative:** Use HM-10 BLE module instead of HC-05 for iOS
+
+### Quick Command Reference
+
+| Type | Send |
+|------|------|
+| Forward | `FWD` |
+| Backward | `BWD` |
+| Left | `LEFT` |
+| Right | `RIGHT` |
+| Stop | `STOP` |
+| Get Position | `POS` |
+| Go to Waypoint | `GOTO:LAT,LON` |
+| Clear Waypoint | `CLEAR` |
+
+**✓ Checkpoint:** Phone connects to robot, commands work reliably
+
+---
+
+## 🧩 PART 5: TROUBLESHOOTING
+
+### Common Issues & Solutions
+
+#### Problem: Arduino won't power from battery
+- **Check:** Buck converter output = 5.0V?
+- **Check:** Connections from buck converter to Arduino VIN/GND
+- **Check:** Battery charged? (Should be >7.0V)
+
+#### Problem: Motors don't spin
+- **Check:** L298N getting 7.4V on +12V terminal?
+- **Check:** Jumper wires from Arduino to L298N IN pins connected?
+- **Check:** Motor wires connected to OUT terminals?
+- **Try:** Upload motor test sketch:
+  ```cpp
+  void setup() {
+    pinMode(22, OUTPUT);
+    pinMode(23, OUTPUT);
+    pinMode(2, OUTPUT);
+  }
+  void loop() {
+    digitalWrite(22, HIGH);
+    digitalWrite(23, LOW);
+    analogWrite(2, 200);
+  }
+  ```
+
+#### Problem: GPS never gets fix
+- **Check:** GPS antenna facing sky (up)?
+- **Check:** Outdoors with clear view?
+- **Check:** GPS powered (5V on VCC)?
+- **Check:** TX/RX wires not swapped?
+- **Wait:** Cold start can take 2 minutes
+
+#### Problem: Bluetooth won't pair
+- **Check:** HC-05 LED blinking (powered)?
+- **Check:** Phone Bluetooth enabled?
+- **Try:** Pair in phone settings first, then connect in app
+- **Check:** Voltage divider installed on RX pin?
+
+#### Problem: Robot drives in circles
+- **Check:** All 4 motors spinning correct direction?
+- **Fix:** Swap wires on motors going wrong way
+- **Calibrate:** Adjust motor speeds in code
+
+#### Problem: Robot doesn't reach waypoint
+- **Check:** GPS fix valid (8+ satellites)?
+- **Check:** Waypoint within reasonable distance (<100m for testing)?
+- **Adjust:** Increase WAYPOINT_THRESHOLD to 5.0m
+- **Check:** Path clear of obstacles?
+
+#### Problem: HC-05 stopped working after connecting
+- **Cause:** Probably fried by 5V on RX pin
+- **Solution:** Replace HC-05, install voltage divider BEFORE connecting
+
+---
+
+## 🔋 Battery Management
+
+### Charging Procedure
+1. **Remove battery from robot**
+2. **Connect to Li-Po charger (B6 or similar)**
+3. **Select:**
+   - Battery type: Li-Po
+   - Cell count: 2S (7.4V)
+   - Charge current: 1.0A (for 2200mAh battery)
+4. **Start charging**
+5. **Stop when:** 8.4V (full charge)
+6. **Never leave charging unattended**
+
+### Battery Safety
+- **Never** discharge below 6.4V (3.2V per cell)
+- **Never** charge above 1C rate (2.2A for 2200mAh)
+- **Store** at 7.4V (storage voltage) if not using for >1 week
+- **Check** for puffing/swelling (discard if puffy)
+- **Use** Li-Po safe bag when charging
+
+### Runtime Expectations
+- **Continuous driving:** ~1.5 hours
+- **Typical delivery pattern (50% duty):** ~3 hours
+- **Idle (motors off):** ~24 hours
+
+---
+
+## 🚀 Next Steps: Usage Tips
+
+### Delivery Mission Planning
+
+1. **Scout route in advance**
+   - Walk path, note obstacles
+   - Identify GPS coordinates of destination
+
+2. **Set waypoints**
+   - Break long routes into 20-30m segments
+   - Send waypoints sequentially:
+     ```
+     GOTO:37.7749,-122.4194  → Wait for "REACHED"
+     GOTO:37.7751,-122.4196  → Wait for "REACHED"
+     ...
+     ```
+
+3. **Monitor progress**
+   - Watch STATUS updates every 2 seconds
+   - Check distance decreasing
+   - Ready to send STOP if needed
+
+### Performance Optimization
+
+- **Reduce weight:** Remove unnecessary components
+- **Increase speed:** Raise BASE_SPEED to 220-255
+- **Better GPS:** Upgrade to NEO-M8N ($15) for faster fix
+- **Add compass:** MPU-9250 IMU for better heading
+
+### Safety Considerations
+
+- Always test in controlled environments first
+- Keep robot in visual line of sight
+- Have emergency STOP ready on phone
+- Don't operate near traffic or crowds
+- Check local laws on autonomous vehicles
+
+---
+
+## 🔄 Maintenance Schedule
+
+### After Each Use
+- [ ] Check battery voltage
+- [ ] Inspect for loose wires
+- [ ] Clean wheels of debris
+- [ ] Verify all screws tight
+
+### Weekly (Heavy Use)
+- [ ] Check solder joints
+- [ ] Tighten all fasteners
+- [ ] Test all motor directions
+- [ ] Calibrate GPS (outdoor stationary test)
+
+### Monthly
+- [ ] Check battery health (capacity test)
+- [ ] Clean motor contacts
+- [ ] Update Arduino code if needed
+- [ ] Inspect chassis for cracks
+
+---
+
+## 🎓 Congratulations!
+
+You've successfully built RASCAL! 
+
+Your autonomous delivery robot is now ready for:
+- ✓ Manual Bluetooth control
+- ✓ GPS waypoint navigation
+- ✓ Autonomous delivery missions
+
+**Next Challenge:** Prototype 2 with Raspberry Pi, ROS, and Lidar!
+
+---
+
+## 📞 Support Resources
+
+- **Arduino Forum:** https://forum.arduino.cc
+- **TinyGPS++ Library:** https://github.com/mikalhart/TinyGPSPlus
+- **GPS Coordinate Finder:** https://www.latlong.net
+- **Battery Calculator:** https://www.omnicalculator.com/other/battery-life
+
+**For Issues:** Check docs/TROUBLESHOOTING.md and docs/FAQ.md
+
+---
+
+*Setup guide version 1.0 - Updated January 2026*
