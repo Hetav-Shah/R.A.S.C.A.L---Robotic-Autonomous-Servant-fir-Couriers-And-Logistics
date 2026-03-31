@@ -1,0 +1,511 @@
+# RASCAL - Wiring Diagram & Connection Guide
+
+## 🔌 Complete Wiring Schematic
+
+### Power Distribution Diagram
+
+```
+                    7.4V Li-Po Battery (2S, 2200mAh)
+                              │
+                         [Power Switch]
+                              │
+                    ┌─────────┴─────────┐
+                    │                   │
+                    ▼                   ▼
+            ┌───────────────┐   ┌───────────────┐
+            │   L298N #1    │   │   L298N #2    │
+            │ Motor Driver  │   │ Motor Driver  │
+            │   12V Input   │   │   12V Input   │
+            └───────┬───────┘   └───────┬───────┘
+                    │                   │
+            ┌───────┴────┐      ┌───────┴────┐
+            ▼            ▼      ▼            ▼
+      [FL Motor]  [FR Motor]  [BL Motor]  [BR Motor]
+      
+      
+                    7.4V Li-Po Battery
+                         │
+                         ├───► Buck Converter #1
+                         │           │
+                         │           ├─► Arduino Mega (5V, GND)
+                         │           │
+                         │           └─► VCC (5V rail for components)
+                         │
+                         └───► Buck Converter #2
+                                     │
+                                     ├─► GPS Module (VCC, GND)
+                                     └─► Bluetooth Module (VCC, GND)
+```
+
+---
+
+## 📋 Connection Tables
+
+### 1. Arduino Mega → L298N Motor Driver #1 (Front Motors)
+
+| Arduino Pin | L298N #1 Pin | Description |
+|-------------|--------------|-------------|
+| D22 | IN1 | Front Left Motor Direction 1 |
+| D23 | IN2 | Front Left Motor Direction 2 |
+| D2 (PWM) | ENA | Front Left Motor Speed (PWM) |
+| D24 | IN3 | Front Right Motor Direction 1 |
+| D25 | IN4 | Front Right Motor Direction 2 |
+| D3 (PWM) | ENB | Front Right Motor Speed (PWM) |
+| GND | GND | Common Ground |
+| 5V | 5V (Logic) | Logic level power |
+
+### 2. Arduino Mega → L298N Motor Driver #2 (Back Motors)
+
+| Arduino Pin | L298N #2 Pin | Description |
+|-------------|--------------|-------------|
+| D26 | IN1 | Back Left Motor Direction 1 |
+| D27 | IN2 | Back Left Motor Direction 2 |
+| D4 (PWM) | ENA | Back Left Motor Speed (PWM) |
+| D28 | IN3 | Back Right Motor Direction 1 |
+| D29 | IN4 | Back Right Motor Direction 2 |
+| D5 (PWM) | ENB | Back Right Motor Speed (PWM) |
+| GND | GND | Common Ground |
+| 5V | 5V (Logic) | Logic level power |
+
+### 3. Arduino Mega → NEO-6M GPS Module
+
+| Arduino Pin | GPS Module Pin | Description |
+|-------------|----------------|-------------|
+| D10 | TX | GPS transmit → Arduino receive |
+| D11 | RX | Arduino transmit → GPS receive |
+| 5V | VCC | Power (from Buck Converter #2) |
+| GND | GND | Ground |
+
+### 4. Arduino Mega → HC-05 Bluetooth Module
+
+| Arduino Pin | HC-05 Pin | Description |
+|-------------|-----------|-------------|
+| D18 (TX1) | RX | Arduino transmit → Bluetooth receive |
+| D19 (RX1) | TX | Bluetooth transmit → Arduino receive |
+| 5V | VCC | Power (from Buck Converter #2) |
+| GND | GND | Ground |
+
+**⚠️ IMPORTANT:** HC-05 RX is 3.3V logic. Use a voltage divider:
+```
+Arduino D18 (5V) ───[1kΩ resistor]───┬───► HC-05 RX
+                                      │
+                              [2kΩ resistor]
+                                      │
+                                     GND
+This creates 3.3V from 5V signal.
+```
+
+### 5. L298N Motor Drivers → TT Motors
+
+#### L298N #1 (Front Motors)
+| L298N #1 Terminal | Motor Connection |
+|-------------------|------------------|
+| OUT1 | Front Left Motor (+) |
+| OUT2 | Front Left Motor (-) |
+| OUT3 | Front Right Motor (+) |
+| OUT4 | Front Right Motor (-) |
+
+#### L298N #2 (Back Motors)
+| L298N #2 Terminal | Motor Connection |
+|-------------------|------------------|
+| OUT1 | Back Left Motor (+) |
+| OUT2 | Back Left Motor (-) |
+| OUT3 | Back Right Motor (+) |
+| OUT4 | Back Right Motor (-) |
+
+### 6. Power Connections
+
+#### Battery → Motor Drivers
+| Battery Terminal | Connection |
+|------------------|------------|
+| Positive (+) | Through Power Switch → L298N #1 +12V, L298N #2 +12V |
+| Negative (-) | GND to both L298N modules |
+
+#### Battery → Buck Converters → Arduino & Modules
+| Component | Input | Output | Connected To |
+|-----------|-------|--------|---------------|
+| Buck Converter #1 | 7.4V from battery | 5V, 1A | Arduino Mega VIN, GND |
+| Buck Converter #2 | 7.4V from battery | 5V, 0.5A | GPS VCC, Bluetooth VCC |
+
+---
+
+## 🖼️ Visual Wiring Diagrams
+
+### Top View - Component Layout
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     Robot Chassis                           │
+│                                                             │
+│  ┌──────┐                               ┌──────┐          │
+│  │  FL  │                               │  FR  │          │
+│  │Wheel │                               │Wheel │          │
+│  └───┬──┘                               └───┬──┘          │
+│      │                                      │              │
+│  [FL Motor]        ┌──────────────┐    [FR Motor]        │
+│                    │   Arduino    │                       │
+│                    │    Mega      │                       │
+│  [GPS Module]      │    2560      │    [Bluetooth]       │
+│   (on top)         └──────────────┘     (on side)        │
+│                                                            │
+│                    ┌──────────────┐                       │
+│   [Buck Conv #1]   │   Battery    │   [Buck Conv #2]     │
+│                    │   7.4V       │                       │
+│                    │   2200mAh    │                       │
+│  [L298N #1]        └──────────────┘    [L298N #2]        │
+│                                                            │
+│  ┌──────┐                               ┌──────┐          │
+│  │  BL  │                               │  BR  │          │
+│  │Wheel │                               │Wheel │          │
+│  └───┬──┘                               └───┬──┘          │
+│      │                                      │              │
+│  [BL Motor]                            [BR Motor]         │
+│                                                            │
+└─────────────────────────────────────────────────────────────┘
+
+          Front ▲
+                │
+                │ Direction of travel
+```
+
+### Electrical Schematic - Simplified
+
+```
+                         +7.4V (Battery)
+                              │
+                         [Switch]
+                              │
+              ┌───────────────┼───────────────┐
+              │               │               │
+         [L298N #1]      [Buck #1]      [Buck #2]
+              │           5V out          5V out
+              │               │               │
+         ┌────┼────┐     ┌────┴────┐    ┌─────┴─────┐
+         │    │    │     │         │    │           │
+      [FL] [FR]  [BL]  [BR]    Arduino   GPS    Bluetooth
+                                Mega
+                                  │
+        ┌─────────────────────────┼─────────────────────┐
+        │ PWM + Direction Control │      Serial Data    │
+        ▼                         ▼                     ▼
+   [L298N #1]               [L298N #2]          [GPS][BT]
+   [L298N #2]
+```
+
+---
+
+## 🔧 Step-by-Step Assembly
+
+### Phase 1: Mechanical Assembly
+
+1. **Mount Motors to Chassis**
+   - Attach 4x TT motors to chassis corners
+   - Secure with M3 screws
+   - Ensure motor shafts point outward
+
+2. **Attach Wheels**
+   - Press-fit wheels onto motor shafts
+   - Ensure tight fit (use hot glue if loose)
+
+3. **Install Chassis Levels**
+   - Use nylon standoffs to create 2-level platform
+   - Bottom: Motors, motor drivers
+   - Top: Arduino, GPS, battery
+
+### Phase 2: Power System
+
+4. **Install Buck Converters**
+   - Mount 2x LM2596 buck converters on chassis
+   - **BEFORE connecting:** Adjust output voltage to exactly 5.0V using multimeter
+     - Turn potentiometer clockwise to increase voltage
+     - Connect 7.4V input and measure output with multimeter
+
+5. **Wire Battery Connector**
+   - Solder XT60 connector to battery leads
+   - Add power switch in series with positive lead
+   - Use heat shrink tubing on connections
+
+6. **Connect Power Distribution**
+   ```
+   Battery (+) → Switch → Split to:
+                          ├─► L298N #1 (+12V)
+                          ├─► L298N #2 (+12V)
+                          ├─► Buck Conv #1 (Input)
+                          └─► Buck Conv #2 (Input)
+   
+   Battery (-) → Common GND
+   ```
+
+### Phase 3: Motor Drivers
+
+7. **Prepare L298N Modules**
+   - Remove 5V enable jumper if using 7.4V input
+   - Connect motors to output terminals (OUT1-OUT4)
+   - **Test polarity:** Briefly power motor; if backwards, swap wires
+
+8. **Wire Motor Control Signals**
+   - Use female-to-male jumper wires
+   - Connect Arduino pins to L298N as per table above
+   - Keep wires organized with zip ties
+
+### Phase 4: Arduino Connections
+
+9. **Mount Arduino Mega**
+   - Secure to top chassis level with M3 screws and standoffs
+   - Ensure USB port is accessible
+
+10. **Connect Power to Arduino**
+    - Buck Converter #1 → Arduino VIN (5V) and GND
+    - **DO NOT** use USB power when motors are running
+
+11. **Connect Motor Control Pins**
+    - Follow "Arduino → L298N" tables above
+    - Double-check PWM pins (2, 3, 4, 5)
+
+### Phase 5: GPS Module
+
+12. **Mount GPS on Top**
+    - Place NEO-6M on top of chassis (clear sky view)
+    - Use double-sided tape or standoffs
+    - Antenna must face upward
+
+13. **Wire GPS Connection**
+    ```
+    GPS VCC → Buck Converter #2 (5V)
+    GPS GND → Common GND
+    GPS TX  → Arduino D10
+    GPS RX  → Arduino D11
+    ```
+
+### Phase 6: Bluetooth Module
+
+14. **Prepare HC-05**
+    - **CRITICAL:** Build voltage divider for RX pin
+      ```
+      Arduino D18 ───[1kΩ]───┬───► HC-05 RX
+                             │
+                          [2kΩ]
+                             │
+                            GND
+      ```
+    - Solder this circuit on a small breadboard
+
+15. **Connect HC-05**
+    ```
+    HC-05 VCC → Buck Converter #2 (5V)
+    HC-05 GND → Common GND
+    HC-05 TX  → Arduino D19 (direct connection OK)
+    HC-05 RX  → Arduino D18 (through voltage divider!)
+    ```
+
+### Phase 7: Final Checks
+
+16. **Secure Battery**
+    - Mount battery on chassis with velcro straps
+    - Ensure weight is centered
+
+17. **Cable Management**
+    - Use zip ties to bundle wires
+    - Keep motor wires away from signal wires
+    - Label connections with tape
+
+18. **Pre-Power Checklist**
+    - [ ] All GNDs connected to common ground
+    - [ ] Buck converters set to 5.0V
+    - [ ] No short circuits (use multimeter)
+    - [ ] Voltage divider on HC-05 RX
+    - [ ] Motor connections secure
+    - [ ] Battery charged
+
+---
+
+## ⚡ Testing Procedure
+
+### Test 1: Power System (No Arduino Code)
+
+1. **Power on with switch**
+2. **Check voltages with multimeter:**
+   - Battery: ~8.4V (fully charged) to 6.4V (empty)
+   - Buck #1 output: 5.0V ±0.1V
+   - Buck #2 output: 5.0V ±0.1V
+   - Arduino 5V pin: 5.0V
+3. **If incorrect:** Adjust buck converter potentiometer
+
+### Test 2: Motor Direction Test
+
+1. **Upload basic motor test sketch:**
+   ```cpp
+   void setup() {
+     pinMode(22, OUTPUT); pinMode(23, OUTPUT);
+     pinMode(2, OUTPUT);
+   }
+   
+   void loop() {
+     digitalWrite(22, HIGH);
+     digitalWrite(23, LOW);
+     analogWrite(2, 150);
+     delay(2000);
+     
+     digitalWrite(22, LOW);
+     analogWrite(2, 0);
+     delay(2000);
+   }
+   ```
+2. **Observe:** FL motor should spin forward for 2s, then stop
+3. **Repeat for all 4 motors**
+4. **If backwards:** Swap motor +/- wires
+
+### Test 3: GPS Fix Test
+
+1. **Upload GPS test sketch (use examples from TinyGPS++ library)**
+2. **Place robot outdoors or near window**
+3. **Open Serial Monitor (9600 baud)**
+4. **Wait 30-60 seconds for GPS fix**
+5. **Verify:** Latitude/Longitude values appear
+
+### Test 4: Bluetooth Connection
+
+1. **Upload code to send "RASCAL:READY" on startup**
+2. **On phone:**
+   - Install "Serial Bluetooth Terminal"
+   - Pair with "HC-05" (PIN: 1234)
+   - Connect in app
+3. **Verify:** "RASCAL:READY" appears
+4. **Send:** `FWD` → Robot should move forward
+
+### Test 5: Full Integration
+
+1. **Upload main RASCAL_Main.ino code**
+2. **Place outdoors with clear sky view**
+3. **Wait for GPS fix (LED blinks)**
+4. **Send Bluetooth commands:**
+   - `FWD`, `BWD`, `LEFT`, `RIGHT`, `STOP`
+5. **Test autonomous:**
+   - Get current position: `POS`
+   - Set waypoint 10m north: `GOTO:LAT+0.0001,LON`
+   - Watch robot navigate
+
+---
+
+## 🔍 Troubleshooting
+
+| Problem | Possible Cause | Solution |
+|---------|----------------|----------|
+| Arduino doesn't power on | Buck converter not adjusted | Measure output, adjust to 5V |
+| Motors don't spin | Wrong pin assignment | Double-check wiring vs code |
+| Motors spin weakly | Low battery | Charge battery, check connections |
+| GPS no fix | Indoors, bad antenna placement | Move outdoors, wait 60s |
+| Bluetooth won't pair | HC-05 not powered | Check 5V and GND connections |
+| HC-05 damaged after connecting | No voltage divider on RX | Replace HC-05, add voltage divider! |
+| Robot turns when going straight | Motor speeds unequal | Calibrate speed in code |
+| Robot drifts from waypoint | GPS accuracy limit | Normal, reduce WAYPOINT_THRESHOLD |
+
+---
+
+## 📐 Wire Gauge Recommendations
+
+| Connection Type | Wire Gauge | Notes |
+|----------------|------------|--------|
+| Battery → Drivers | 18-20 AWG | High current |
+| Motor → Driver | 20-22 AWG | Moderate current |
+| Power (5V) | 22-24 AWG | Low current |
+| Signal (GPIO) | 26-28 AWG | Jumper wires OK |
+
+---
+
+## 🎨 Color Coding Convention
+
+```
+Red    → Positive power (+7.4V, +5V)
+Black  → Ground (GND)
+Yellow → PWM signals (motor speed)
+Green  → Serial TX (transmit)
+Blue   → Serial RX (receive)
+Orange → Digital I/O (motor direction)
+```
+
+---
+
+## 🛡️ Safety Notes
+
+1. **Li-Po Battery Safety**
+   - Never over-discharge below 6.4V (3.2V per cell)
+   - Use Li-Po bag when charging
+   - Don't puncture or short circuit
+   - Dispose properly if damaged (puffy)
+
+2. **Voltage Divider**
+   - HC-05 RX is 3.3V tolerant, Arduino is 5V
+   - Direct 5V → 3.3V input WILL damage HC-05
+   - Always use voltage divider on Arduino TX → HC-05 RX
+
+3. **Power Isolation**
+   - Don't power Arduino via USB when motors are running
+   - Use separate buck converters for logic and high-current devices
+
+4. **Short Circuit Protection**
+   - Check all connections with multimeter before powering
+   - Add fuse in battery positive lead (recommended: 5A fuse)
+
+---
+
+## 📸 Component Photos for Reference
+
+### L298N Pin Labels
+```
+┌───────────────────────────────┐
+│         L298N Module          │
+├───────────────────────────────┤
+│ +12V  GND  5V                │ ← Power input
+│                               │
+│ [OUT1] [OUT2] [OUT3] [OUT4]  │ ← Motor outputs
+│                               │
+│ IN1 IN2 ENA | IN3 IN4 ENB    │ ← Control inputs
+└───────────────────────────────┘
+```
+
+### NEO-6M GPS Pin Labels
+```
+┌─────────────┐
+│  NEO-6M GPS │
+├─────────────┤
+│ VCC  [Red]  │
+│ GND  [Blk]  │
+│ TX   [Grn]  │
+│ RX   [Blu]  │
+└─────────────┘
+```
+
+### HC-05 Bluetooth Pin Labels
+```
+┌──────────────┐
+│   HC-05 BT   │
+├──────────────┤
+│ VCC   [Red]  │
+│ GND   [Blk]  │
+│ TXD   [Grn]  │ → Arduino RX
+│ RXD   [Blu]  │ → Arduino TX (via divider!)
+│ STATE        │
+│ EN           │
+└──────────────┘
+```
+
+---
+
+## 📦 Assembly Time Estimate
+
+| Phase | Time | Difficulty |
+|-------|------|------------|
+| Mechanical assembly | 1 hour | Easy |
+| Power system | 1 hour | Medium |
+| Motor wiring | 1.5 hours | Medium |
+| Arduino connections | 1 hour | Medium |
+| GPS & Bluetooth | 1 hour | Medium (voltage divider) |
+| Testing & debugging | 2 hours | Hard |
+| **TOTAL** | **7.5 hours** | **Medium** |
+
+*First-time builders: add 2-3 hours for learning curve*
+
+---
+
+*Keep this guide handy during assembly. Take photos of your connections for future reference.*
