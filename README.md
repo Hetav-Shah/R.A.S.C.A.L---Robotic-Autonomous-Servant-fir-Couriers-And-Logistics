@@ -98,7 +98,7 @@ The second prototype focuses on **intelligence, perception, and robustness**.
 
 ## 📬 Connect with me
 - 🌐 Portfolio: https://shahhetav.my.canva.site/
-- 💼 LinkedIn: (add your link)
-- 📧 Email: (add your email)
+- 💼 LinkedIn: www.linkedin.com/in/hetav--shah
+- 📧 Email: hetav.ubs@gmail.com
 
 ---
