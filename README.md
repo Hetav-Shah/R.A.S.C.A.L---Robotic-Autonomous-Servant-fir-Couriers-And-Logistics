@@ -6,6 +6,11 @@ RASCAL is an autonomous mobile robot designed for last-mile delivery application
 
 The goal of this project is to develop a robot capable of navigating real-world environments, avoiding obstacles, and delivering packages efficiently with minimal human intervention.
 
+
+https://github.com/user-attachments/assets/97637182-ccf0-4386-8f26-bfa4046b3d35
+
+
+
 ---
 
 ## 🧠 Problem Statement
@@ -86,6 +91,15 @@ The second prototype focuses on **intelligence, perception, and robustness**.
 - Sensor noise and environmental variability require adaptive strategies  
 - System integration (hardware + software) is the biggest challenge  
 
+
+
+
+https://github.com/user-attachments/assets/ead47679-252b-4ddd-95c1-c096aacddda8
+
+
+
+
+
 ---
 
 ## 🔮 Future Scope
@@ -102,3 +116,7 @@ The second prototype focuses on **intelligence, perception, and robustness**.
 - 📧 Email: hetav.ubs@gmail.com
 
 ---
+
+
+
+
