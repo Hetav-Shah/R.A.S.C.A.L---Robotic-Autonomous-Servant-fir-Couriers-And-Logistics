@@ -1,0 +1,206 @@
+# RASCAL — Robotic Autonomous Servant for Companion & Logistics
+
+> *"We don't build robots. We build relationships."*
+
+---
+
+## The Problem with Deep Tech in India
+
+India produces the world's largest pipeline of engineering talent. Yet Indian deep tech — especially robotics — has a graveyard problem.
+
+Most robotics startups in India fail not because the technology doesn't work. They fail because the **market doesn't care**. They build robots optimized for cost-efficiency in logistics or manufacturing, enter a fight with cheap human labor, lose on unit economics, and shut down before Series A.
+
+The pattern is predictable:
+1. Build a technically impressive robot
+2. Target B2B logistics or warehousing
+3. Discover that Indian clients won't pay for automation that replaces ₹15,000/month labor
+4. Run out of runway
+
+We studied this failure mode. Then we deliberately built against it.
+
+---
+
+## Our Insight: India Buys Emotions, Not Efficiency
+
+What does India consistently pay a premium for?
+
+- A child's first birthday photographed by a professional
+- A five-star hotel that makes you feel seen
+- A gift that says *"I thought about you"*
+
+India is not a market that pays for cold operational efficiency. India is a market that pays for **warmth, status, and belonging**.
+
+This is the insight that defines our company. We build robots that people **feel something for**.
+
+---
+
+## What We're Building: The RASCAL Companion Platform
+
+RASCAL is a family of social and service robots designed for environments where **emotional presence matters**.
+
+Each robot in our lineup is a **companion** — not a tool. They are designed to be trusted, relied upon, and in some cases, loved.
+
+---
+
+### 🍼 RASCAL Nanny — The Robot That Never Misses a Moment
+
+> *For the parent who is at work while their child is at home.*
+
+India has over 300 million working parents. A significant portion of dual-income households in Tier 1 and Tier 2 cities face a silent guilt: they are not there. They miss first steps, first words, the tiny chaos of a toddler's afternoon.
+
+RASCAL Nanny is a companion robot designed to be present *for* them.
+
+**What it does:**
+- Detects and follows toddlers using computer vision (age-adaptive behavior)
+- Engages children with age-appropriate learning content — shapes, colors, language, songs
+- Streams live footage to parents via a companion app with smart moment detection
+- Flags safety events (child near stairs, child crying, child alone in an unusual zone)
+- Automatically curates and saves highlight reels — *first smile, first word, first fall-and-stand*
+
+**What it sells:**
+Not childcare. Not surveillance. **Presence.** The parent at the office who gets a notification: *"Aryan just said 'mama' — here's the clip"* — that parent will never cancel their subscription.
+
+This is a subscription model with high emotional lock-in. Churn is not a concern when the product is your child's memories.
+
+**Target customer:** Urban dual-income families, ₹12L+ household income, children aged 1–6.
+
+**Pricing model:** ₹4,999/month subscription (app, cloud storage, AI curated moments) + one-time robot hardware deposit.
+
+---
+
+### 🏨 RASCAL Concierge — The Robot That Makes People Stop and Stare
+
+> *For hotels, colleges, and event spaces that want to be remembered.*
+
+There is a growing category of venue in India — aspirational five-star hotels, premium college campuses, luxury malls, corporate headquarters — where the physical environment is a signal of prestige.
+
+RASCAL Concierge is a sleek, beautifully designed service robot that operates as a roving ambassador for these spaces.
+
+**What it does:**
+- Greets guests, answers questions about the venue
+- Navigates autonomously between floors and corridors
+- Guides visitors to rooms, restaurants, or departments
+- Displays dynamic content — menus, announcements, event schedules
+- Acts as a photo opportunity — people *want* to photograph themselves with it
+
+**What it sells:**
+Status. Modernity. A talking point. When a family checks into a hotel and their child races toward the robot, that hotel has won something no concierge desk ever could — **a memory**.
+
+Venues in India spend lakhs on lobby art and imported furniture to signal premium-ness. RASCAL Concierge is lobby art that moves.
+
+**Target customer:** 5-star hotels, premium college campuses (IITs, private universities), corporate headquarters, luxury malls, airports.
+
+**Pricing model:** B2B lease — ₹1.5L–2.5L/month per unit including maintenance SLA.
+
+---
+
+### 📦 RASCAL Courier (Origin Prototype — Now Evolved)
+
+The original RASCAL prototype was built for last-mile logistics. It demonstrated:
+
+- GPS-based autonomous navigation (outdoor environments)
+- Mobile-app-controlled delivery interface
+- Obstacle detection and avoidance
+- Mechanical robustness across terrain variation
+
+**Prototype 1** (completed): Arduino + GPS, C++, SolidWorks-designed chassis, successful real-world delivery demo.
+
+**Prototype 2** (in progress): Raspberry Pi, LiDAR, ROS integration, SLAM-based mapping, dynamic obstacle avoidance.
+
+This work forms the **technical foundation** of the entire RASCAL platform. The navigation stack, sensor integration, and control systems developed for Courier are inherited by Nanny and Concierge — accelerating our build timeline significantly.
+
+RASCAL Courier will be repositioned as a **campus and gated-community last-mile delivery product**, where autonomous delivery is viable because environments are controlled, distances are short, and labor costs are already a concern.
+
+---
+
+## Why RASCAL Can Win in India Where Others Have Failed
+
+| Challenge | How Others Fail | How We Win |
+|---|---|---|
+| Price sensitivity | B2B logistics robots compete with ₹15K/month labor | We sell to customers who pay for *emotion and status*, not labor replacement |
+| Long hardware cycles | 3–5 years to product-market fit | Shared platform — Courier prototype already built; Nanny and Concierge share the stack |
+| No recurring revenue | One-time hardware sales | Subscription for Nanny (cloud, AI moments); lease model for Concierge |
+| Regulatory complexity | Outdoor drones/delivery face airspace rules | Indoor and campus-only deployment avoids most regulatory exposure |
+| Import dependency | 90–95% of components imported | Designing for swappable commodity hardware (RPi, off-shelf sensors) from day one |
+
+---
+
+## Traction & Technical Foundation
+
+- ✅ Prototype 1 complete — autonomous outdoor delivery demonstrated
+- ✅ Full hardware stack documented (BOM, wiring schematics, control architecture)
+- ✅ Mobile app built and integrated
+- 🔄 Prototype 2 in progress — LiDAR + ROS + SLAM
+- 📐 RASCAL Nanny form factor design underway in SolidWorks
+- 🤝 Conversations underway with [venue partners — to be updated]
+
+---
+
+## The Team
+
+**Hetav Shah** — Founder & Lead Engineer
+Mechanical Engineer with deep expertise in robotics, CAD, and embedded systems. Built RASCAL Courier end-to-end — hardware, firmware, software, and app integration. Passionate about designing robots that exist in the real world, not just in simulation.
+
+- Portfolio: [shahhetav.my.canva.site](https://shahhetav.my.canva.site/)
+- LinkedIn: [linkedin.com/in/hetav--shah](https://www.linkedin.com/in/hetav--shah)
+- Email: hetav.ubs@gmail.com
+
+*[Team members — add co-founders here]*
+
+---
+
+## Tech Stack
+
+**Hardware**
+- Arduino (embedded control, Prototype 1)
+- Raspberry Pi 4 (onboard compute, Prototype 2+)
+- GPS, LiDAR, camera array
+- Custom SolidWorks chassis
+
+**Software**
+- C++ — control systems and embedded logic
+- Python — high-level autonomy and integration
+- ROS — robot operating system (Prototype 2)
+- SLAM — simultaneous localization and mapping
+- Computer vision — toddler detection, face recognition, moment classification (Nanny)
+
+**App**
+- Mobile companion app (delivery control, live stream, moment alerts)
+- Cloud backend for AI-curated video highlights (Nanny)
+
+---
+
+## Market Size
+
+- Indian smart home market: $6.5B by 2030 (CAGR ~28%)
+- Indian hospitality market: $32B (5-star segment growing rapidly post-pandemic)
+- Working parents in India (dual-income, urban): ~120M+
+- Indian edtech spending per household: ₹8,000–40,000/year — Nanny competes in this mindset
+
+We don't need the whole market. We need **50 hotels and 10,000 families**.
+
+That's ₹15Cr ARR at current pricing.
+
+---
+
+## What We're Raising For
+
+- Complete Prototype 2 (LiDAR, ROS, SLAM)
+- Build RASCAL Nanny v1 (form factor, computer vision, companion app)
+- Pilot with 3 hotels (Concierge) and 50 families (Nanny)
+- Hardware procurement and manufacturing partnerships
+
+---
+
+## Contact
+
+Building something people haven't seen before — in India, by India.
+
+📧 hetav.ubs@gmail.com  
+🌐 [shahhetav.my.canva.site](https://shahhetav.my.canva.site/)  
+💼 [linkedin.com/in/hetav--shah](https://www.linkedin.com/in/hetav--shah)  
+🐙 [github.com/Hetav-Shah](https://github.com/Hetav-Shah)
+
+---
+
+*RASCAL is an open-source robotics platform. Hardware schematics, BOM, control architecture, and firmware are documented in this repository.*
